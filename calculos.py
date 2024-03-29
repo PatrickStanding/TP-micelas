@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
 #%% DATOS
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 Temps=[26.5,35.5,45.25,52,60] #ºC
 
@@ -29,8 +31,9 @@ k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
 error_temp=0.2
 error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
 error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conductimetro, debe ser el 1%
-#%%
-# BUSCO  n y lambda en funcion de T
+#%% BUSCO  n y lambda en funcion de T
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 n_lista=[]
 lambda_na_lista=[]
 def n_test(n,T):
@@ -63,10 +66,14 @@ for T in Temps:
 print("%"*60,"\n")
 
 #%% K vs Cs
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 DEBUG_K_VS_CS=False
-p1_lista=[]
-p2_lista=[]
-cmc_lista=[]
+p1_lista=[] #lista con las pendientes a Cs baja
+p2_lista=[] #lista con las pendientes a Cs alta
+o1_lista=[] #lista con las ordenadas a Cs baja
+o2_lista=[] #lista con las ordenadas a Cs alta
+cmc_lista=[] #lista con las a CMC
 
 for i in range(len(k)):
     #ajuste lineal para Cs<CMC
@@ -86,7 +93,9 @@ for i in range(len(k)):
     ordenada2=model.intercept_
     
     p1_lista.append(pendiente1)
+    o1_lista.append(ordenada1)
     p2_lista.append(pendiente2)
+    o2_lista.append(ordenada2)
 
     print(f"TEMP {Temps[i]}")
     print(f"ordenada={ordenada1}")
@@ -107,20 +116,68 @@ for i in range(len(k)):
                 [concentraciones[medicion_de_corte],concentraciones[-1]],
                 [concentraciones[medicion_de_corte]*pendiente2+ordenada2,concentraciones[-1]*pendiente2+ordenada2]
                 )
+        axes.set(
+            title=f"T={Temps[i]}"
+        )
     
     CMC=abs(ordenada1-ordenada2)/abs(pendiente1-pendiente2)
     print(f"CMC={CMC}")
     print('\n','%'*20,'\n')
     
     cmc_lista.append(CMC[0])
-#%%Figuras K vs Cs
+#%% Figuras K vs Cs
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+sns.set_theme(context='paper')
+
+#colores
+colores=sns.color_palette("colorblind", len(Temps))
+
 fig,axes = plt.subplots()
+
 for i in range(len(Temps)):
+    puntos=sns.scatterplot(
+        x=concentraciones,
+        y=k[i],
+        label=f"T={Temps[i]}ºC",
+        color=colores[i]
+    )
     
+    #el ajuste lineal a Cs baja
+    cc_baja=[concentraciones[0],concentraciones[medicion_de_corte+1]]
+    y_baja=cc_baja*p1_lista[i]+o1_lista[i]
+
+    ajuste_1=plt.plot(
+        cc_baja,
+        y_baja,
+        c=colores[i],
+        linestyle='--'
+    )
+    #el ajuste lineal a Cs alta
+    cc_alta=[concentraciones[medicion_de_corte-1],concentraciones[-1]]
+    y_alta=cc_alta*p2_lista[i]+o2_lista[i]
+
+    ajuste_2=plt.plot(
+        cc_alta,
+        y_alta,
+        c=colores[i],
+        linestyle='--'
+    )
+    axes.set(
+        title="$\kappa\ vs\ Cs$",
+        xlabel="Cs [m]",
+        ylabel=r"$\kappa \left[\mu S\right]$"
+    )
+plt.legend()
+plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
+
 #%% CALCULO ALPHA
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
 # Y=a*X^2+b*X+c
 alpha_lista=[]
-for i in Temps:
+for i in range(len(Temps)):
     n=n_lista[i]
     p1=p1_lista[i]
     p2=p2_lista[i]
