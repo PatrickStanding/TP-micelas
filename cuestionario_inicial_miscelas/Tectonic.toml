@@ -1,0 +1,7 @@
+[doc]
+name = "cuestionario_inicial_miscelas"
+bundle = "https://data1.fullyjustified.net/tlextras-2022.0r0.tar"
+
+[[output]]
+name = "Cuestionario_inicial_miscelas"
+type = "pdf"

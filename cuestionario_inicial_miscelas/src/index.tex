@@ -1,0 +1,54 @@
+\thispagestyle{empty}
+\textit{1) ¿Qué se entiende por concentración micelar crítica (CMC)? Indique bajo qué modelo de agregación se racionalizará los resultados y cuál es su supuesto central.}
+
+\bigskip
+
+CMC es la concentración de tensioactovo a partir de la cual se forman micela.
+Su supuesto central es que por debajo de esta concentración las moléculas de tensioactivo se comportan como moléculas libre y las miselas se forman solo cuando interactuan una cantidad determinada de moléculas de tensioactivo.
+
+
+
+\bigskip
+\textit{2) ¿Qué propiedad del sistema medirá en el TP con tal de obtener la CMC?
+Explique muy brevemente cómo se obtendrá la CMC experimentalmente, señalando qué especies presentes en solución derivan en el cambio del comportamiento de la propiedad medida del sistema antes y posteriormente a la CMC.}
+\bigskip
+
+Para obtener la CMC mido la conductividad de soluciones del tensioactivo a distintas concentraciones y temperaturas, luego se realizan 2 ajustes lineales de la conductividad ($\kappa$) en función de la concentración de tensioactivo ($C_{sc}$). El punto de quiebre/ intersección de este ajuste ocurre en $C_{sc}=CMC$.
+
+\begin{align*}
+    \kappa =& C_{sc} (\lambda^s+\lambda^c)=p_1.C_{sc}\\
+    \kappa =& q+p_2.C_{sc}
+\end{align*}
+
+
+
+
+
+\bigskip
+\textit{3) Indique al menos 3 supuestos que serán llevados a cabo durante el procesamiento de los datos obtenidos.}
+\bigskip
+
+\begin{itemize}
+    \item el radio de la micela es proporcional a $n^{1/3}$ con $C_{sc}$ cerca de $CMC$ para micela con $n>50$.
+    \item cerca de la CMC los coeficientes de actividad iónicos en la ecuación de equilibrio de formación de micelas son aproximadamente 1.
+    \item en solución diluida ($C_{sc}<CMC$) la conductividad molar de todos los iones es similar a la estandar a dilución infinita ($\lambda \approx \lambda_0$)
+    \item el tensioactivo es un electrolito 1:1.
+\end{itemize}
+
+
+\bigskip
+\textit{4) ¿Qué función termodinámica es posible obtener con medidas a una única temperatura? Explique muy brevemente cómo se obtienen las otras funciones termodinámicas experimentalmente.}
+\bigskip
+
+Es posible obtener la ($\Delta_{mic}G^0$) a una temperatura T.
+
+Como luego de alcanzar la CMC el agregado de tensioactivo solo genera micelas que son peores portadores de carga que el tensioactivo libre se produce un cambio de la pendiente de $\kappa$ vs $C_{sc}$, por lo tanto, a partir del punto de inflección se obtiene $C_{sc}$.
+
+Se calcula el grado de ionización ($\alpha$) a partir de $n^(2/3)\alpha^2(p_1-\lambda^c)+\alpha\lambda^c-p_2=0$ (los valores de $p_1$,$p_2$ provienen del ajuste lineal nombrado anteriormente. $n$ y $\lambda^c$ proviene de otras fórmulas que dependen de la temperatura)
+
+Finalmente se calcula:
+\begin{itemize}
+    \item $\Delta_{mic}G^0$ con $\Delta_{mic}G^0=RT(2-\alpha)ln(CMC)$
+    \item $\Delta_{mic}H^0$ mediante $\Delta_{mic}H^0=-T^2\left(\pdv{\Delta_{mic}G^0/T}{T}\right)_p$
+    \item $\Delta_{mic}S^0=\frac{\Delta_{mic}H^0-T\Delta_{mic}G^0}{T}$
+\end{itemize}
