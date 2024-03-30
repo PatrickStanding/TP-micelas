@@ -7,6 +7,7 @@ Created on Wed Mar 27 17:40:09 2024
 #%%
 import numpy as np
 from scipy.optimize import fsolve
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
@@ -32,6 +33,7 @@ k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
 error_temp=0.2
 error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
 error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conductimetro, debe ser el 1%
+
 #%% BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -59,7 +61,7 @@ for T in Temps:
 
     n = fsolve(f, T)
     
-    lambda_na= 22.24+1.135*T**3
+    lambda_na= 22.24+1.135*(T**3)
     lambda_na_lista.append(lambda_na)
     n_lista.append(n)
     
@@ -176,6 +178,9 @@ plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 # Y=a*X^2+b*X+c
+#TODO:Para las ultimas 2 T la cuadrática no tiene raiz,
+#revisé y estan bien los valores 
+
 alpha_lista=[]
 for i in range(len(Temps)):
     n=n_lista[i]
@@ -185,8 +190,120 @@ for i in range(len(Temps)):
     a=n**(2/3)*(p1-lambda_na)
     b=lambda_na
     c=-p2
-    alpha=[(-b+np.sqrt(b**2-4*a*c))/(2*a),(-b+np.sqrt(b**2-4*a*c))/(2*a)]
-
-#%% 
-    plt.scatter(Temps,np.log(np.array(cmc_lista)))
+    alpha=[(-b+np.sqrt(b**2-4*a*c))/(2*a),(-b-np.sqrt(b**2-4*a*c))/(2*a)]
+    print(Temps[i],"ºC---> b²-2a=",b**2-4*a*c)
+    #elijo el alfa<0
+    for j in alpha:
+        if j<0:
+            alpha_lista.append(j[0])
+    else:
+        print("NO HAY RAICES NEGATIVAS")
+for i in range(len(alpha_lista)): print(Temps[i],"ºC---> alpha=",alpha_lista[i]) #%% Grafico de la cuadratica, me importan los alfas<1
+xlimite=1.2
+fig,ax =plt.subplots()
+for i in range(len(Temps)):
+    n=n_lista[i]
+    p1=p1_lista[i]
+    p2=p2_lista[i]
+    lambda_na=lambda_na_lista[i]
+    def alpha(x):
+        global n
+        global p1
+        global p2
+        global lambda_na
+        return n**(2/3)*x**2*(p1-lambda_na)+x*lambda_na-p2
+    x=np.linspace(-xlimite,xlimite,100)
+    y=alpha(x)
+    sns.scatterplot(
+        x=x,
+        y=y,
+        label=f"T={Temps[i]}"
+    ).set(
+        xlim=[-xlimite,0.01],
+        ylim=[-.25E6,.25E6]
+    )
+    plt.hlines(
+        0,
+        -xlimite,
+        0
+    )
+ax.set(
+    title=r"$f(n)=n^{2/3}\alpha^2(p_1-\lambda^{Na^+}+\alpha\lambda^{Na^+})$",
+    xlabel=r'$\alpha$'
+)
+plt.legend()
     
+#%% CALCULO Gomix
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+def Go(T,alfa,CMC):
+    R=8.31446261815324 #J/(mol*K)
+    return R*T*(2-alfa)*np.log(CMC)
+Go_lista=[]
+
+#quite las experiencias a T donde no pude calcular alfa
+for i in range(len(Temps[:-2])):
+    delta_Go_mic=Go(
+        T=Temps[i],
+        alfa=alpha_lista[i],
+        CMC=cmc_lista[i]
+        )
+    Go_lista.append(delta_Go_mic)
+
+#%% alfa vs T
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+#ajuste lineal para Cs<CMC
+x= np.array(Temps[:-2]).reshape((-1,1))
+y = np.array(alpha_lista)
+model.fit(x, y)
+dalfa_dT=model.coef_
+ordenada=model.intercept_
+fig,axes = plt.subplots()
+sns.scatterplot(
+    x=Temps[:-2],
+    y=alpha_lista
+)
+plt.plot(
+    Temps[:-2],
+    Temps[:-2]*dalfa_dT+ordenada,
+    ls='--'
+)
+axes.set(
+    xlabel="T[ºC]",
+    ylabel=r"$\alpha$"
+)
+#%% CMC vs T
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+def pol_CMC(T,A,B,C):
+    #el ajuste de la guia
+    return A+B*T+C/T
+def dlncmc_dt(T,A,B,C):
+    #d/dT del ajuste
+    return B*C/T**2
+ln_cmc=np.log(cmc_lista)
+
+param_pol_CMC,covar_pol_CMC= curve_fit(pol_CMC,Temps,ln_cmc)
+
+dlnCMC_dT_lista = dlncmc_dt(np.array(Temps),*param_pol_CMC)
+
+
+fig,axes=plt.subplots()
+sns.scatterplot(
+    x=Temps,
+    y=ln_cmc
+)
+plt.plot(
+    np.linspace(Temps[0],Temps[-1],20),
+    pol_CMC(np.linspace(Temps[0],Temps[-1],20),*param_pol_CMC),
+    linestyle='--',
+    label=r"$CMC=A+BT+C/T$"+"\nA={:.4g} B={:.4g} C={:.4g}".format(*param_pol_CMC)
+)
+axes.set(
+    xlabel="T [ºC]",
+    ylabel="ln(CMC)"
+)
+plt.legend()
+# %%
