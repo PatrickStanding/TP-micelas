@@ -10,6 +10,7 @@ from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
+sns.set_theme(context='paper')#configuro el formato de graficos
 #%% DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -128,7 +129,6 @@ for i in range(len(k)):
 #%% Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-sns.set_theme(context='paper')
 
 #colores
 colores=sns.color_palette("colorblind", len(Temps))
