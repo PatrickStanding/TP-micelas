@@ -12,7 +12,14 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
 import statsmodels.api as sm
+import pandas as pd
 sns.set_theme(context='paper')#configuro el formato de graficos
+def redondeo(numero,error):
+    cifras_cignificaitvas=len(f"{err_ordenada_menor:.1g}".split('.')[1])
+    redondeado=round(numero,cifras_cignificaitvas)
+    return(redondeado)
+
+
 #%% DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -46,7 +53,14 @@ error_temp=0.2
 error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
 error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conductimetro, debe ser el 1%
 
-
+#exporto datos para la corrección
+columna_k=[]
+for i in Temps:
+    columna_k.append(f"T_{i}C")
+df={'Concentracion[m]':concentraciones}
+df_={columna_k[i]:k[i] for i in range(len(Temps))}
+df={**df,**df_}
+df=pd.DataFrame(df)
 #%% BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -263,7 +277,8 @@ ax.set(
     title=r"$f(n)=n^{2/3}\alpha^2(p_1-\lambda^{Na^+}+\alpha\lambda^{Na^+})$",
     xlabel=r'$\alpha$'
 )
-plt.legend()
+plt.legend(bbox_to_anchor=(1.01,1.05), loc="upper left")
+plt.savefig('figuras/alfa_cuadrativa.png',dpi=300)
     
 #%% CALCULO Gomix
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -286,29 +301,63 @@ for i in range(len(Temps[:-2])):
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-x= np.array(Temps[:-2]).reshape((-1,1))
-y = np.array(alpha_lista)
 #hay 2 ajustes linials, alta a T bajos y alfa a T altos
+#el de menor T
+medicion_cambio_pendiente=4
+x= np.array(Temps[:medicion_cambio_pendiente])
+y = np.array(alpha_lista[:medicion_cambio_pendiente])
+x = sm.add_constant(x)
+model_menor = sm.OLS(y,x).fit()
+predictions_menor = model_menor.predict(x) 
+print_model = model_menor.summary()
+ordenada_menor,pendiente_menor= model_menor.params
+err_ordenada_menor, err_pendiente_menor = model_menor.bse
+print(print_model)
 
-x_bajo=x[]
-model.fit(x, y)
-dalfa_dT=model.coef_
-ordenada=model.intercept_
+#el -2 es porque en las últimas 2 temp no pude calcular alfa
+x= np.array(Temps[medicion_cambio_pendiente-1:-2])
+y = np.array(alpha_lista[medicion_cambio_pendiente-1:])
+x = sm.add_constant(x)
+model_mayor = sm.OLS(y,x).fit()
+predictions_mayor = model_mayor.predict(x) 
+print_model = model_mayor.summary()
+ordenada_mayor, pendiente_mayor= model_mayor.params
+err_ordenada_mayor, err_pendiente_mayor = model_mayor.bse
 
+
+#voy a tener 2 pendintes dalfa/dT, una para T<25 y otra pra T>25
+#los pongo en la lista dalfa_dT_lista que está emparejada con la Temps
+dalfa_dT_sub25=pendiente_menor
+err_dalfa_dT_sub25=err_pendiente_menor
+dalfa_dT_sob25=err_pendiente_mayor
+err_dalfa_dT_sob25=err_pendiente_mayor
+
+dalfa_dT_lista=np.array([dalfa_dT_sub25]*3+[dalfa_dT_sob25]*3)
+print(print_model)
+#%%
 fig,axes = plt.subplots()
 sns.scatterplot(
     x=Temps[:-2],
     y=alpha_lista
 )
 plt.plot(
-    Temps[:-2],
-    Temps[:-2]*dalfa_dT+ordenada,
-    ls='--'
+    Temps[:medicion_cambio_pendiente],
+    predictions_menor,
+    ls='--',
+    label=r'$\alpha=$'+f'{redondeo(pendiente_menor,err_pendiente_menor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
+)
+plt.plot(
+    Temps[medicion_cambio_pendiente-1:-2],
+    predictions_mayor,
+    ls='--',
+    label=r'$\alpha=$'+f'{redondeo(pendiente_mayor,err_pendiente_mayor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
 )
 axes.set(
     xlabel="T[ºC]",
     ylabel=r"$\alpha$"
 )
+plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+plt.savefig('figuras/alfavst.png',dpi=300,bbox_inches='tight')
 #%% CMC vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -320,12 +369,20 @@ def dlncmc_dt(T,A,B,C):
     return B*C/T**2
 ln_cmc=np.log(cmc_lista)
 
-param_pol_CMC,covar_pol_CMC= curve_fit(pol_CMC,Temps,ln_cmc)
+param_pol_CMC,covar_pol_CMC= curve_fit(pol_CMC,Temps[3:],ln_cmc[3:])
 
 dlnCMC_dT_lista = dlncmc_dt(np.array(Temps),*param_pol_CMC)
 
 
 fig,axes=plt.subplots()
+
+sns.scatterplot(
+    x=Temps[:3],
+    y=ln_cmc[:3],
+    facecolor='red',
+    zorder=10,
+    label='datos descartados'
+)
 sns.scatterplot(
     x=Temps,
     y=ln_cmc
@@ -334,13 +391,15 @@ plt.plot(
     np.linspace(Temps[0],Temps[-1],20),
     pol_CMC(np.linspace(Temps[0],Temps[-1],20),*param_pol_CMC),
     linestyle='--',
-    label=r"$CMC=A+BT+C/T$"+"\nA={:.4g} B={:.4g} C={:.4g}".format(*param_pol_CMC)
+    label=r"$CMC=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g} B={param_pol_CMC[1]:.4g} C={param_pol_CMC[2]:.4g}"
 )
 axes.set(
     xlabel="T [ºC]",
     ylabel="ln(CMC)"
 )
 plt.legend()
+plt.savefig('figuras/lnCMCvsT.png',dpi=300,bbox_inches='tight')
+
 #%% H y S
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -352,11 +411,12 @@ def calculo_S(T:np.ndarray,H:np.ndarray,G:np.ndarray):
     S= (H-G)/T 
     return S
 
+
 H_lista=calculo_H(
     T=np.array(Temps)[:-2],
     alpha=np.array(alpha_lista),
     dlncmc_dt=dlnCMC_dT_lista[:-2],
-    dalfa_dT=dalfa_dT[0],
+    dalfa_dT=dalfa_dT_lista,
     ln_cmc=ln_cmc[:-2]
 )
 
@@ -370,4 +430,33 @@ S_lista=calculo_S(
 print(f"{'Temp[ºC]':>15}{'dG':>15}{'dH':>15}{'dS':>15}")
 for i in range(len(Temps[:-2])):
     print(f"{Temps[i]:>15}{Go_lista[i]:>15.8g}{H_lista[i]:>15.8g}{S_lista[i]:>15.8g}")
-# %%
+# %% Figura termo vs T
+fig,axes = plt.subplots()
+
+sns.lineplot(
+    x=Temps[:-2],
+    y=Go_lista,
+    dashes=False,
+    marker='o',
+    label=r'$\Delta_{mic}G^0$'
+)
+
+sns.lineplot(
+    x=Temps[:-2],
+    y=H_lista,
+    dashes=False,
+    marker='o',
+    label=r'$\Delta_{mic}H^0$'
+)
+sns.lineplot(
+    x=Temps[:-2],
+    y=S_lista*Temps[:-2],
+    dashes=False,
+    marker='o',
+    label=r'$T\Delta_{mic}S^0$'
+)
+
+axes.set(
+    xlabel="T[ºC]"
+)
+plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
