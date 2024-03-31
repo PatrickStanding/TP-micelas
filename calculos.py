@@ -15,6 +15,7 @@ sns.set_theme(context='paper')#configuro el formato de graficos
 #%% DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+R=8.31446261815324 #J/(mol*K)
 
 Temps=[26.5,35.5,45.25,52,60] #ºC
 
@@ -237,7 +238,7 @@ plt.legend()
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 def Go(T,alfa,CMC):
-    R=8.31446261815324 #J/(mol*K)
+    global R
     return R*T*(2-alfa)*np.log(CMC)
 Go_lista=[]
 
@@ -254,12 +255,12 @@ for i in range(len(Temps[:-2])):
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-#ajuste lineal para Cs<CMC
 x= np.array(Temps[:-2]).reshape((-1,1))
 y = np.array(alpha_lista)
 model.fit(x, y)
 dalfa_dT=model.coef_
 ordenada=model.intercept_
+
 fig,axes = plt.subplots()
 sns.scatterplot(
     x=Temps[:-2],
@@ -306,4 +307,33 @@ axes.set(
     ylabel="ln(CMC)"
 )
 plt.legend()
+#%% H y S
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+def calculo_H(T:np.ndarray,alpha:np.ndarray,dlncmc_dt:np.ndarray,dalfa_dT:float,ln_cmc:np.ndarray):
+    global R
+    H= -R*T**2*((2-alpha)*dlncmc_dt-dalfa_dT*ln_cmc)
+    return H
+def calculo_S(T:np.ndarray,H:np.ndarray,G:np.ndarray):
+    S= (H-G)/T 
+    return S
+
+H_lista=calculo_H(
+    T=np.array(Temps)[:-2],
+    alpha=np.array(alpha_lista),
+    dlncmc_dt=dlnCMC_dT_lista[:-2],
+    dalfa_dT=dalfa_dT[0],
+    ln_cmc=ln_cmc[:-2]
+)
+
+S_lista=calculo_S(
+    T=np.array(Temps)[:-2],
+    G=Go_lista,
+    H=H
+)
+
+
+print(f"{'Temp[ºC]':>15}{'dG':>15}{'dH':>15}{'dS':>15}")
+for i in range(len(Temps[:-2])):
+    print(f"{Temps[i]:>15}{Go_lista[i]:>15.8g}{H_lista[i]:>15.8g}{S_lista[i]:>15.8g}")
 # %%
