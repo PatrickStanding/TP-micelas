@@ -11,6 +11,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
+import statsmodels.api as sm
 sns.set_theme(context='paper')#configuro el formato de graficos
 #%% DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -30,10 +31,21 @@ k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
    [48.7,201,289,389,501,782,1310,1409,1547,1836,2110]
 ]
 
+# Valores a CC_bajas
+Temps_baja=[10,15,20]
+k_baja=[[28.9,74.3,106.5,139.5,172.8,232,416,451,515,581,677],
+        [32,84.5,120.1,158.2,197.5,269,473,516,591,666,782],
+        [35.18,94.37,134.5,176.7,220,306,527,576,661,746,878]
+]
+
+#junto las dos series de mediciones
+Temps=Temps_baja+Temps
+k=k_baja+k
 #TODO: Completar Errores de las mediciones
 error_temp=0.2
 error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
 error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conductimetro, debe ser el 1%
+
 
 #%% BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -65,8 +77,24 @@ for T in Temps:
     lambda_na= 22.24+1.135*(T**3)
     lambda_na_lista.append(lambda_na)
     n_lista.append(n)
+
+#para las T bajas
+print(f"{'T[ºC]':<15}{'n':<15}{'lambda_Na':<15}")
+for T in Temps:
+    def f(x):
+        """El resolvedor busca raizes así que T=f(n) lo paso a F(n,T)=f(n)-T=0 y 
+        las raices son el n que busco para cada T
+        """
+        global T
+        return -0.28*x+(5.3E5)*(x**(-7/3))+7.5-T
+
+    n = fsolve(f, T)
     
-    print(f"T={T}\tn={n}\tlambda_Na={lambda_na}")
+    lambda_na= 22.24+1.135*(T**3)
+    lambda_na_lista.append(lambda_na)
+    n_lista.append(n)
+    print(f"{T:<15}{n[0]:<15.8g}{lambda_na:<15.8g}")
+    #print(f"{T:>10}{n:>10}{lambda_na:>10}")
 print("%"*60,"\n")
 
 #%% K vs Cs
@@ -79,6 +107,7 @@ o1_lista=[] #lista con las ordenadas a Cs baja
 o2_lista=[] #lista con las ordenadas a Cs alta
 cmc_lista=[] #lista con las a CMC
 
+print(f"{'T[ºC]':<8}{'CMC':<15}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
 for i in range(len(k)):
     #ajuste lineal para Cs<CMC
     medicion_de_corte=6 #divide los datos en 2 series de 6 valores
@@ -101,11 +130,6 @@ for i in range(len(k)):
     p2_lista.append(pendiente2)
     o2_lista.append(ordenada2)
 
-    print(f"TEMP {Temps[i]}")
-    print(f"ordenada={ordenada1}")
-    print(f"pendiente={pendiente1}")
-    print(f"ordenada={ordenada2}")
-    print(f"pendiente={pendiente2}")
     if DEBUG_K_VS_CS==True: 
         fig, axes = plt.subplots()
         data=plt.scatter(
@@ -125,10 +149,11 @@ for i in range(len(k)):
         )
     
     CMC=abs(ordenada1-ordenada2)/abs(pendiente1-pendiente2)
-    print(f"CMC={CMC}")
-    print('\n','%'*20,'\n')
     
     cmc_lista.append(CMC[0])
+
+    print(f"{Temps[i]:<8}{CMC[0]:<15.8g}{pendiente1[0]:<15.8g}{ordenada1:<15.8g}{pendiente2[0]:<15.8g}{ordenada2:<15.8g}")
+print('\n','%'*20,'\n')
 #%% Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -181,7 +206,7 @@ plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 # Y=a*X^2+b*X+c
 #TODO:Para las ultimas 2 T la cuadrática no tiene raiz,
 #revisé y estan bien los valores 
-
+print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
 alpha_lista=[]
 for i in range(len(Temps)):
     n=n_lista[i]
@@ -192,14 +217,20 @@ for i in range(len(Temps)):
     b=lambda_na
     c=-p2
     alpha=[(-b+np.sqrt(b**2-4*a*c))/(2*a),(-b-np.sqrt(b**2-4*a*c))/(2*a)]
-    print(Temps[i],"ºC---> b²-2a=",b**2-4*a*c)
     #elijo el alfa<0
     for j in alpha:
+        imprimo=False #variable para imprimir tabla
         if j<0:
             alpha_lista.append(j[0])
+            imprimo=True
+        else:
+            alfa_pos=j
+    if imprimo==True:
+        print(f"{Temps[i]:<8}{j[0]:<15.8g}{alfa_pos[0]:<15.8g}{b**2-4*a[0]*c[0]:<15.8g}")
     else:
-        print("NO HAY RAICES NEGATIVAS")
-for i in range(len(alpha_lista)): print(Temps[i],"ºC---> alpha=",alpha_lista[i]) #%% Grafico de la cuadratica, me importan los alfas<1
+        print(f"{Temps[i]:<8}{'!∃ raiz real':<30}{b**2-4*a[0]*c[0]:<15.8g}")
+ #%% Grafico de la cuadratica, me importan los alfas<1
+
 xlimite=1.2
 fig,ax =plt.subplots()
 for i in range(len(Temps)):
@@ -257,6 +288,9 @@ for i in range(len(Temps[:-2])):
 
 x= np.array(Temps[:-2]).reshape((-1,1))
 y = np.array(alpha_lista)
+#hay 2 ajustes linials, alta a T bajos y alfa a T altos
+
+x_bajo=x[]
 model.fit(x, y)
 dalfa_dT=model.coef_
 ordenada=model.intercept_
@@ -329,7 +363,7 @@ H_lista=calculo_H(
 S_lista=calculo_S(
     T=np.array(Temps)[:-2],
     G=Go_lista,
-    H=H
+    H=H_lista
 )
 
 
