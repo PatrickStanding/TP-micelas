@@ -298,7 +298,7 @@ ax.set(
     xlabel=r'$\alpha$'
 )
 plt.legend(bbox_to_anchor=(1.01,1.05), loc="upper left")
-plt.savefig('figuras/alfa_cuadrativa.png',dpi=300)
+plt.savefig('figuras/alfa_cuadrativa.png',dpi=300,bbox_inches='tight')
     
 #%% CALCULO Gomic
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -469,7 +469,10 @@ for i in range(len(Temps[:-2])):
     print(f"{Temps[i]:>15}{Go_lista[i]:>15.8g}{H_lista[i]:>15.8g}{S_lista[i]:>15.8g}")
 # %% Figura termo vs T
 fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
-
+#lo paso a kJ en vez de joules
+Go_lista*=1e-3
+H_lista*=1e-3
+S_lista*=1e-3
 #nuestros datos
 gibss=sns.lineplot(
     x=Temps[3:-2],
@@ -521,9 +524,15 @@ sns.lineplot(
     ax=axes[1],
     label=r'$T\Delta_{mic}S^0$'
 )
+
+plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+axes[0].legend_=None
 axes[0].set(
-    xlabel="T[ºC]",
-    ylabel="$\Delta_{mis}G0$"
+    xlabel="T[K]",
+    ylabel=r"$\Delta_{mis}G^0,\Delta_{mis}H^0,T\Delta_{mis}S^0\ \left[kJ/mol\right]$"
+)
+axes[1].set(
+    xlabel="T[K]"
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 # %%
