@@ -36,7 +36,7 @@ k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
    [39.3,160.4,232,313,399,596,987,1065,1168,1381,1605],
    [43.3,178.7,257,347,447,679,1133,1219,1333,1591,1827],
    [48.7,201,289,389,501,782,1310,1409,1547,1836,2110]
-]
+] #micro Siemes /cm
 
 # Valores a CC_bajas
 Temps_baja=[10,15,20]
@@ -56,11 +56,12 @@ error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conducti
 #exporto datos para la corrección
 columna_k=[]
 for i in Temps:
-    columna_k.append(f"T_{i}C")
+    columna_k.append(f"k_T{i}C")
 df={'Concentracion[m]':concentraciones}
 df_={columna_k[i]:k[i] for i in range(len(Temps))}
 df={**df,**df_}
 df=pd.DataFrame(df)
+df.to_csv('reportes/datos.csv',index=False)
 #%% BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -77,6 +78,7 @@ def n_test(n,T):
     else:
         return print("MAL, n(T={T})") 
 
+print(f"{'T[ºC]':<15}{'n':<15}{'lambda_Na[uS/(cm.molal)]':<15}")
 
 for T in Temps:
     def f(x):
@@ -86,31 +88,17 @@ for T in Temps:
         global T
         return -0.28*x+(5.3E5)*(x**(-7/3))+7.5-T
 
-    n = fsolve(f, T)
+    n = fsolve(f, T) #f=funcion a buscar raiz, T=valor cerce del que buscar
     
     lambda_na= 22.24+1.135*(T**3)
     lambda_na_lista.append(lambda_na)
-    n_lista.append(n)
+    n_lista.append(n[0])
 
-#para las T bajas
-print(f"{'T[ºC]':<15}{'n':<15}{'lambda_Na':<15}")
-for T in Temps:
-    def f(x):
-        """El resolvedor busca raizes así que T=f(n) lo paso a F(n,T)=f(n)-T=0 y 
-        las raices son el n que busco para cada T
-        """
-        global T
-        return -0.28*x+(5.3E5)*(x**(-7/3))+7.5-T
-
-    n = fsolve(f, T)
-    
-    lambda_na= 22.24+1.135*(T**3)
-    lambda_na_lista.append(lambda_na)
-    n_lista.append(n)
     print(f"{T:<15}{n[0]:<15.8g}{lambda_na:<15.8g}")
-    #print(f"{T:>10}{n:>10}{lambda_na:>10}")
 print("%"*60,"\n")
 
+#Reporte
+df_reporte=pd.DataFrame({'T[ºC]':Temps,'n':n_lista,'lambda_Na':lambda_na_lista})
 #%% K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -121,7 +109,9 @@ o1_lista=[] #lista con las ordenadas a Cs baja
 o2_lista=[] #lista con las ordenadas a Cs alta
 cmc_lista=[] #lista con las a CMC
 
-print(f"{'T[ºC]':<8}{'CMC':<15}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
+print(f"{'T':<8}{'CMC':<15}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
+print(f"{'[ºC]':<8}{'[molal]':<15}{'uS/cm.molal':<15}{'uS/cm':<15}{'uS/cm.molal':<15}{'uS/cm':<15}")
+
 for i in range(len(k)):
     #ajuste lineal para Cs<CMC
     medicion_de_corte=6 #divide los datos en 2 series de 6 valores
@@ -139,9 +129,9 @@ for i in range(len(k)):
     pendiente2=model.coef_
     ordenada2=model.intercept_
     
-    p1_lista.append(pendiente1)
+    p1_lista.append(pendiente1[0])
     o1_lista.append(ordenada1)
-    p2_lista.append(pendiente2)
+    p2_lista.append(pendiente2[0])
     o2_lista.append(ordenada2)
 
     if DEBUG_K_VS_CS==True: 
@@ -168,6 +158,13 @@ for i in range(len(k)):
 
     print(f"{Temps[i]:<8}{CMC[0]:<15.8g}{pendiente1[0]:<15.8g}{ordenada1:<15.8g}{pendiente2[0]:<15.8g}{ordenada2:<15.8g}")
 print('\n','%'*20,'\n')
+
+#Reporte
+df_reporte['CMC[molal]']=cmc_lista
+df_reporte['pendiente1[uS/(cm.molal)]']=p1_lista
+df_reporte['ordenada1[molal]']=o1_lista
+df_reporte['pendiente2[uS/(cm.molal)]']=p2_lista
+df_reporte['ordenada2[molal]']=o2_lista
 #%% Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -175,42 +172,62 @@ print('\n','%'*20,'\n')
 #colores
 colores=sns.color_palette("colorblind", len(Temps))
 
-fig,axes = plt.subplots()
+fig,axes = plt.subplots(nrows=1,ncols=2)
 
-for i in range(len(Temps)):
-    puntos=sns.scatterplot(
-        x=concentraciones,
-        y=k[i],
-        label=f"T={Temps[i]}ºC",
-        color=colores[i]
-    )
-    
-    #el ajuste lineal a Cs baja
-    cc_baja=[concentraciones[0],concentraciones[medicion_de_corte+1]]
-    y_baja=cc_baja*p1_lista[i]+o1_lista[i]
+for cuadrante in [0,1]:
+    for i in range(len(Temps)):
+        puntos=sns.scatterplot(
+            x=concentraciones,
+            y=k[i],
+            label=f"T={Temps[i]}ºC",
+            color=colores[i],
+            ax=axes[cuadrante]
+        )
+        
+        #el ajuste lineal a Cs baja
+        cc_baja=[concentraciones[0],cmc_lista[1]*1.1]
+        y_baja=np.array(cc_baja)*p1_lista[i]+o1_lista[i]
 
-    ajuste_1=plt.plot(
-        cc_baja,
-        y_baja,
-        c=colores[i],
-        linestyle='--'
-    )
-    #el ajuste lineal a Cs alta
-    cc_alta=[concentraciones[medicion_de_corte-1],concentraciones[-1]]
-    y_alta=cc_alta*p2_lista[i]+o2_lista[i]
+        ajuste_1=axes[cuadrante].plot(
+            cc_baja,
+            y_baja,
+            c=colores[i],
+            linestyle='--'
+        )
+        #el ajuste lineal a Cs alta
+        cc_alta=[cmc_lista[i]*0.9,concentraciones[-1]]
+        y_alta=np.array(cc_alta)*p2_lista[i]+o2_lista[i]
 
-    ajuste_2=plt.plot(
-        cc_alta,
-        y_alta,
-        c=colores[i],
-        linestyle='--'
+        ajuste_2=axes[cuadrante].plot(
+            cc_alta,
+            y_alta,
+            c=colores[i],
+            linestyle='--'
+        )
+        axes[cuadrante].set(
+            xlabel="Cs [m]",
+            ylabel=r"$\kappa \left[\mu S\right]$"
+        )
+#plt.vlines()
+axes[1].vlines(
+        x=np.array(cmc_lista),
+        ymin=[0]*len(cmc_lista),
+        ymax=np.array(cmc_lista)*np.array(p1_lista)+np.array(o1_lista),
+        colors=colores
     )
-    axes.set(
-        title="$\kappa\ vs\ Cs$",
-        xlabel="Cs [m]",
-        ylabel=r"$\kappa \left[\mu S\right]$"
+
+plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+axes[0].legend_=None
+axes[1].set(
+    xlim=[0.0059,0.0073],
+    ylim=[200,1010],
+    ylabel=None,
+    xticks=cmc_lista,
+    xlabel="$Cs \ [m10^{-3}]$"
     )
-plt.legend()
+zoom_x_label=[f"{i:.4g}" for i in np.array(cmc_lista)*1e3]
+zoom_x_label[4]=None
+axes[1].set_xticklabels(zoom_x_label,rotation=90)
 plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 
 #%% CALCULO ALPHA
@@ -218,6 +235,7 @@ plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 # Y=a*X^2+b*X+c
+# 0<alfa<1  es grado de ionizacion == relacion entre ionizado y no ionizado
 #TODO:Para las ultimas 2 T la cuadrática no tiene raiz,
 #revisé y estan bien los valores 
 print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
@@ -231,22 +249,26 @@ for i in range(len(Temps)):
     b=lambda_na
     c=-p2
     alpha=[(-b+np.sqrt(b**2-4*a*c))/(2*a),(-b-np.sqrt(b**2-4*a*c))/(2*a)]
-    #elijo el alfa<0
+    #elijo el alfa>0
+    imprimo=False #variable para imprimir tabla
     for j in alpha:
-        imprimo=False #variable para imprimir tabla
-        if j<0:
-            alpha_lista.append(j[0])
+        if j>0:
+            alpha_lista.append(j)
+            pos=j
             imprimo=True
         else:
-            alfa_pos=j
+            alfa_neg=j
     if imprimo==True:
-        print(f"{Temps[i]:<8}{j[0]:<15.8g}{alfa_pos[0]:<15.8g}{b**2-4*a[0]*c[0]:<15.8g}")
+        print(f"{Temps[i]:<8}{pos:<15.8g}{alfa_neg:<15.8g}{b**2-4*a*c:<15.8g}")
     else:
-        print(f"{Temps[i]:<8}{'!∃ raiz real':<30}{b**2-4*a[0]*c[0]:<15.8g}")
- #%% Grafico de la cuadratica, me importan los alfas<1
+        print(f"{Temps[i]:<8}{'!∃ raiz real':<30}{b**2-4*a*c:<15.8g}")
 
-xlimite=1.2
+#Reporte
+df_reporte['alfa']=alpha_lista+[np.nan]*2
+ #%% Grafico de la cuadratica, me importan los alfas<1
+#Figura
 fig,ax =plt.subplots()
+minimox,maximox=-1,0.5
 for i in range(len(Temps)):
     n=n_lista[i]
     p1=p1_lista[i]
@@ -258,21 +280,19 @@ for i in range(len(Temps)):
         global p2
         global lambda_na
         return n**(2/3)*x**2*(p1-lambda_na)+x*lambda_na-p2
-    x=np.linspace(-xlimite,xlimite,100)
+
+    x=np.linspace(minimox,maximox,100)
     y=alpha(x)
-    sns.scatterplot(
+    sns.lineplot(
         x=x,
         y=y,
+        zorder=2,
         label=f"T={Temps[i]}"
     ).set(
-        xlim=[-xlimite,0.01],
+        xlim=[minimox,maximox],
         ylim=[-.25E6,.25E6]
     )
-    plt.hlines(
-        0,
-        -xlimite,
-        0
-    )
+    plt.hlines(xmin=minimox,xmax=maximox,y=0,color='grey',zorder=1,linewidth=0.2)
 ax.set(
     title=r"$f(n)=n^{2/3}\alpha^2(p_1-\lambda^{Na^+}+\alpha\lambda^{Na^+})$",
     xlabel=r'$\alpha$'
@@ -280,47 +300,61 @@ ax.set(
 plt.legend(bbox_to_anchor=(1.01,1.05), loc="upper left")
 plt.savefig('figuras/alfa_cuadrativa.png',dpi=300)
     
-#%% CALCULO Gomix
+#%% CALCULO Gomic
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+#
+#    A PARTIR DE AHORA USO [T]=K
+Temps=np.array(Temps)+273
+alpha_lista=np.array(alpha_lista)
+cmc_lista=np.array(cmc_lista)
 def Go(T,alfa,CMC):
     global R
     return R*T*(2-alfa)*np.log(CMC)
 Go_lista=[]
 
+Go_lista=Go(
+    T=Temps[:-2],
+    alfa=alpha_lista,
+    CMC=cmc_lista[:-2]
+)
 #quite las experiencias a T donde no pude calcular alfa
-for i in range(len(Temps[:-2])):
-    delta_Go_mic=Go(
-        T=Temps[i],
-        alfa=alpha_lista[i],
-        CMC=cmc_lista[i]
-        )
-    Go_lista.append(delta_Go_mic)
-
+# for i in range(len(Temps[:-2])):
+#     delta_Go_mic=Go(
+#         T=Temps[i],
+#         alfa=alpha_lista[i],
+#         CMC=cmc_lista[i]
+#         )
+#     Go_lista.append(delta_Go_mic)
+#Reporte
+df_reporte['delta_Go[kJ/mol]']=np.append(Go_lista,[np.nan]*2)/1000
 #%% alfa vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 #hay 2 ajustes linials, alta a T bajos y alfa a T altos
 #el de menor T
+# pendiente=dalfa/dT=[1/T]
 medicion_cambio_pendiente=4
 x= np.array(Temps[:medicion_cambio_pendiente])
 y = np.array(alpha_lista[:medicion_cambio_pendiente])
 x = sm.add_constant(x)
 model_menor = sm.OLS(y,x).fit()
 predictions_menor = model_menor.predict(x) 
-print_model = model_menor.summary()
 ordenada_menor,pendiente_menor= model_menor.params
 err_ordenada_menor, err_pendiente_menor = model_menor.bse
-print(print_model)
+print_model_menor = model_menor.summary()
+print(print_model_menor)
 
+#el de mayor T
 #el -2 es porque en las últimas 2 temp no pude calcular alfa
 x= np.array(Temps[medicion_cambio_pendiente-1:-2])
 y = np.array(alpha_lista[medicion_cambio_pendiente-1:])
 x = sm.add_constant(x)
 model_mayor = sm.OLS(y,x).fit()
 predictions_mayor = model_mayor.predict(x) 
-print_model = model_mayor.summary()
+print_model_mayor = model_mayor.summary()
 ordenada_mayor, pendiente_mayor= model_mayor.params
 err_ordenada_mayor, err_pendiente_mayor = model_mayor.bse
 
@@ -333,7 +367,11 @@ dalfa_dT_sob25=err_pendiente_mayor
 err_dalfa_dT_sob25=err_pendiente_mayor
 
 dalfa_dT_lista=np.array([dalfa_dT_sub25]*3+[dalfa_dT_sob25]*3)
-print(print_model)
+print(print_model_menor)
+
+#Reportes
+# file_name=f"reportes/ajuste/alfavst_tmayor_{i}"
+    # print_model_mayor.tables[i].as_csv
 #%%
 fig,axes = plt.subplots()
 sns.scatterplot(
@@ -344,13 +382,13 @@ plt.plot(
     Temps[:medicion_cambio_pendiente],
     predictions_menor,
     ls='--',
-    label=r'$\alpha=$'+f'{redondeo(pendiente_menor,err_pendiente_menor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
+    #label=r'$\alpha=$'+f'{redondeo(pendiente_menor,err_pendiente_menor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
 )
 plt.plot(
     Temps[medicion_cambio_pendiente-1:-2],
     predictions_mayor,
     ls='--',
-    label=r'$\alpha=$'+f'{redondeo(pendiente_mayor,err_pendiente_mayor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
+    #label=r'$\alpha=$'+f"{pendiente_mayor}{err_pendiente_mayor}T{ordenada_menor}{err_ordenada_menor}'"
 )
 axes.set(
     xlabel="T[ºC]",
@@ -358,7 +396,7 @@ axes.set(
 )
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
 plt.savefig('figuras/alfavst.png',dpi=300,bbox_inches='tight')
-#%% CMC vs T
+#%% ln(CMC) vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 def pol_CMC(T,A,B,C):
@@ -366,7 +404,7 @@ def pol_CMC(T,A,B,C):
     return A+B*T+C/T
 def dlncmc_dt(T,A,B,C):
     #d/dT del ajuste
-    return B*C/T**2
+    return B-C/T**2
 ln_cmc=np.log(cmc_lista)
 
 param_pol_CMC,covar_pol_CMC= curve_fit(pol_CMC,Temps[3:],ln_cmc[3:])
@@ -388,7 +426,7 @@ sns.scatterplot(
     y=ln_cmc
 )
 plt.plot(
-    np.linspace(Temps[0],Temps[-1],20),
+    np.linspace(Temps[3],Temps[-1],20),
     pol_CMC(np.linspace(Temps[0],Temps[-1],20),*param_pol_CMC),
     linestyle='--',
     label=r"$CMC=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g} B={param_pol_CMC[1]:.4g} C={param_pol_CMC[2]:.4g}"
@@ -399,7 +437,6 @@ axes.set(
 )
 plt.legend()
 plt.savefig('figuras/lnCMCvsT.png',dpi=300,bbox_inches='tight')
-
 #%% H y S
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -431,32 +468,64 @@ print(f"{'Temp[ºC]':>15}{'dG':>15}{'dH':>15}{'dS':>15}")
 for i in range(len(Temps[:-2])):
     print(f"{Temps[i]:>15}{Go_lista[i]:>15.8g}{H_lista[i]:>15.8g}{S_lista[i]:>15.8g}")
 # %% Figura termo vs T
-fig,axes = plt.subplots()
+fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
 
-sns.lineplot(
-    x=Temps[:-2],
-    y=Go_lista,
+#nuestros datos
+gibss=sns.lineplot(
+    x=Temps[3:-2],
+    y=Go_lista[3:],
     dashes=False,
     marker='o',
+    ax=axes[0],
     label=r'$\Delta_{mic}G^0$'
 )
-
 sns.lineplot(
-    x=Temps[:-2],
-    y=H_lista,
+    x=Temps[3:-2],
+    y=H_lista[3:],
     dashes=False,
     marker='o',
+    ax=axes[0],
     label=r'$\Delta_{mic}H^0$'
 )
 sns.lineplot(
-    x=Temps[:-2],
-    y=S_lista*Temps[:-2],
+    x=Temps[3:-2],
+    y=S_lista[3:]*Temps[3:-2],
     dashes=False,
     marker='o',
+    ax=axes[0],
     label=r'$T\Delta_{mic}S^0$'
 )
 
-axes.set(
-    xlabel="T[ºC]"
+#datos del excel
+gibss=sns.lineplot(
+    x=Temps[:3],
+    y=Go_lista[:3],
+    dashes=False,
+    marker='o',
+    ax=axes[1],
+    label=r'$\Delta_{mic}G^0$'
+)
+sns.lineplot(
+    x=Temps[:3],
+    y=H_lista[:3],
+    dashes=False,
+    marker='o',
+    ax=axes[1],
+    label=r'$\Delta_{mic}H^0$'
+)
+sns.lineplot(
+    x=Temps[:3],
+    y=S_lista[:3]*Temps[:3],
+    dashes=False,
+    marker='o',
+    ax=axes[1],
+    label=r'$T\Delta_{mic}S^0$'
+)
+axes[0].set(
+    xlabel="T[ºC]",
+    ylabel="$\Delta_{mis}G0$"
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
+# %%
+
+
