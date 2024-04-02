@@ -13,6 +13,8 @@ from sklearn.linear_model import LinearRegression
 import seaborn as sns
 import statsmodels.api as sm
 import pandas as pd
+from my_libs import exportador_latex as etex
+
 sns.set_theme(context='paper')#configuro el formato de graficos
 def redondeo(numero,error):
     cifras_cignificaitvas=len(f"{err_ordenada_menor:.1g}".split('.')[1])
@@ -98,7 +100,7 @@ for T in Temps:
 print("%"*60,"\n")
 
 #Reporte
-df_reporte=pd.DataFrame({'T[ºC]':Temps,'n':n_lista,'lambda_Na':lambda_na_lista})
+df_reporte=pd.DataFrame({'T[K]':Temps,'n':n_lista,'lambda_Na[uS/cm.molal]':lambda_na_lista})
 #%% K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -110,7 +112,7 @@ o2_lista=[] #lista con las ordenadas a Cs alta
 cmc_lista=[] #lista con las a CMC
 
 print(f"{'T':<8}{'CMC':<15}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
-print(f"{'[ºC]':<8}{'[molal]':<15}{'uS/cm.molal':<15}{'uS/cm':<15}{'uS/cm.molal':<15}{'uS/cm':<15}")
+print(f"{'[K]':<8}{'[molal]':<15}{'uS/cm.molal':<15}{'uS/cm':<15}{'uS/cm.molal':<15}{'uS/cm':<15}")
 
 for i in range(len(k)):
     #ajuste lineal para Cs<CMC
@@ -161,11 +163,11 @@ print('\n','%'*20,'\n')
 
 #Reporte
 df_reporte['CMC[molal]']=cmc_lista
-df_reporte['pendiente1[uS/(cm.molal)]']=p1_lista
-df_reporte['ordenada1[molal]']=o1_lista
-df_reporte['pendiente2[uS/(cm.molal)]']=p2_lista
-df_reporte['ordenada2[molal]']=o2_lista
-#%% Figuras K vs Cs
+df_reporte['cmc_pendiente1[uS/(cm.molal)]']=p1_lista
+df_reporte['cmc_ordenada1[molal]']=o1_lista
+df_reporte['cmc_pendiente2[uS/(cm.molal)]']=p2_lista
+df_reporte['cmc_ordenada2[molal]']=o2_lista
+#%%Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
@@ -177,15 +179,15 @@ fig,axes = plt.subplots(nrows=1,ncols=2)
 for cuadrante in [0,1]:
     for i in range(len(Temps)):
         puntos=sns.scatterplot(
-            x=concentraciones,
+           x=concentraciones,
             y=k[i],
-            label=f"T={Temps[i]}ºC",
+            label=f"T={Temps[i]}K",
             color=colores[i],
             ax=axes[cuadrante]
         )
         
         #el ajuste lineal a Cs baja
-        cc_baja=[concentraciones[0],cmc_lista[1]*1.1]
+        cc_baja=[concentraciones[0],cmc_lista[i]*1.1]
         y_baja=np.array(cc_baja)*p1_lista[i]+o1_lista[i]
 
         ajuste_1=axes[cuadrante].plot(
@@ -229,6 +231,43 @@ zoom_x_label=[f"{i:.4g}" for i in np.array(cmc_lista)*1e3]
 zoom_x_label[4]=None
 axes[1].set_xticklabels(zoom_x_label,rotation=90)
 plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
+#%%Figura una sola serie
+i=3
+fig,axes= plt.subplots()
+puntos=sns.scatterplot(
+    x=concentraciones,
+    y=k[3],
+    label=f"T={Temps[3]}K",
+)
+#el ajuste lineal a Cs baja
+cc_baja=[concentraciones[0],cmc_lista[3]*1.1]
+y_baja=np.array(cc_baja)*p1_lista[i]+o1_lista[i]
+
+ajuste_1=plt.plot(
+    cc_baja,
+    y_baja,
+    c=colores[i],
+    linestyle='--',
+    label="ajuste lineal"
+)
+#el ajuste lineal a Cs alta
+cc_alta=[cmc_lista[i]*0.9,concentraciones[-1]]
+y_alta=np.array(cc_alta)*p2_lista[i]+o2_lista[i]
+
+ajuste_2=plt.plot(
+    cc_alta,
+    y_alta,
+    c=colores[i],
+    linestyle='--'
+)
+axes.set(
+    xlabel="Cs [m]",
+    ylabel=r"$\kappa \ \left[\mu S\right/cm]$"
+)
+
+plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+
+plt.savefig('figuras/kvsCs_solo.png',dpi=300,bbox_inches='tight')
 
 #%% CALCULO ALPHA
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -330,8 +369,7 @@ Go_lista=Go(
 #Reporte
 df_reporte['delta_Go[kJ/mol]']=np.append(Go_lista,[np.nan]*2)/1000
 #%% alfa vs T
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 #hay 2 ajustes linials, alta a T bajos y alfa a T altos
 #el de menor T
@@ -370,8 +408,8 @@ dalfa_dT_lista=np.array([dalfa_dT_sub25]*3+[dalfa_dT_sob25]*3)
 print(print_model_menor)
 
 #Reportes
-# file_name=f"reportes/ajuste/alfavst_tmayor_{i}"
-    # print_model_mayor.tables[i].as_csv
+#TODO exportar los resultados del ajuste cuadrático
+df_reporte["dalfa_dT[1/K]"]=np.append(dalfa_dT_lista,[np.nan]*2)
 #%%
 fig,axes = plt.subplots()
 sns.scatterplot(
@@ -391,7 +429,7 @@ plt.plot(
     #label=r'$\alpha=$'+f"{pendiente_mayor}{err_pendiente_mayor}T{ordenada_menor}{err_ordenada_menor}'"
 )
 axes.set(
-    xlabel="T[ºC]",
+    xlabel="T [ºC]",
     ylabel=r"$\alpha$"
 )
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
@@ -432,7 +470,7 @@ plt.plot(
     label=r"$CMC=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g} B={param_pol_CMC[1]:.4g} C={param_pol_CMC[2]:.4g}"
 )
 axes.set(
-    xlabel="T [ºC]",
+    xlabel="T [K]",
     ylabel="ln(CMC)"
 )
 plt.legend()
@@ -464,9 +502,12 @@ S_lista=calculo_S(
 )
 
 
-print(f"{'Temp[ºC]':>15}{'dG':>15}{'dH':>15}{'dS':>15}")
+print(f"{'Temp[K]':>15}{'dG':>15}{'dH':>15}{'dS':>15}")
 for i in range(len(Temps[:-2])):
     print(f"{Temps[i]:>15}{Go_lista[i]:>15.8g}{H_lista[i]:>15.8g}{S_lista[i]:>15.8g}")
+#Reporte
+df_reporte['dH[KJ/mol]']=np.append(H_lista,[np.nan]*2)
+df_reporte['dS[KJ/K.mol]']=np.append(S_lista,[np.nan]*2)
 # %% Figura termo vs T
 fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
 #lo paso a kJ en vez de joules
@@ -528,13 +569,27 @@ sns.lineplot(
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
 axes[0].legend_=None
 axes[0].set(
+    title="[1]",
     xlabel="T[K]",
     ylabel=r"$\Delta_{mis}G^0,\Delta_{mis}H^0,T\Delta_{mis}S^0\ \left[kJ/mol\right]$"
 )
 axes[1].set(
-    xlabel="T[K]"
+    xlabel="T[K]",
+    title="[2]"
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
+# %%Reportes (ignorar)
+
+df_reporte.to_csv('reportes/valores.csv')
+tex='reportes/datos.txt'
+
+cmc=df_reporte*1e-3
+variable_name='cmc_'+df_reporte['T[K]'].astype(str)
+variable=df_reporte['CMC[molal]']
+etex.variable(
+    tex,
+    variable_name,
+    variable
+)
+
 # %%
-
-
