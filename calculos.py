@@ -14,14 +14,14 @@ import seaborn as sns
 import statsmodels.api as sm
 import pandas as pd
 from my_libs import exportador_latex as etex
+from scipy.optimize import leastsq
+import sympy as sp
 
 sns.set_theme(context='paper')#configuro el formato de graficos
-def redondeo(numero,error):
-    cifras_cignificaitvas=len(f"{err_ordenada_menor:.1g}".split('.')[1])
-    redondeado=round(numero,cifras_cignificaitvas)
-    return(redondeado)
-
-
+def prinvalor(valor,error):
+    return f"{valor:.5g}pm{error:.1g}"
+def Reporte_valor(valor_lista,error_lista):
+    return [(valor_lista[i],error_lista[i]) for i in range(len(valor_lista))]
 #%% DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -30,7 +30,7 @@ R=8.31446261815324 #J/(mol*K)
 Temps=[26.5,35.5,45.25,52,60] #ºC
 
 concentraciones=np.array([0.01,0.04,0.06,.08,0.1,0.15,0.35,0.4,0.5,0.6,0.75])
-PM_SDS=288.38 #g/mol
+PM_SDS=288.38 #g/mºol
 concentraciones=concentraciones*10/PM_SDS #pasar de %m/v a molal
 
 k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
@@ -51,24 +51,31 @@ k_baja=[[28.9,74.3,106.5,139.5,172.8,232,416,451,515,581,677],
 Temps=Temps_baja+Temps
 k=k_baja+k
 #TODO: Completar Errores de las mediciones
-error_temp=0.2
+error_temp=0.02
 error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
-error_conduct=1 #susuce 1 pero tendriamos que haber leido el manual del conductimetro, debe ser el 1%
+error_conduct=0.1 #susuce 10% pero tendriamos que haber leido el manual del conductimetro
 
-#exporto datos para la corrección
+err_Temps=[error_temp]*(len(Temps))
+
+
+err_k= [0.1*np.array(i) for i in k]
+
+
+#Reportes
 columna_k=[]
 for i in Temps:
     columna_k.append(f"k_T{i}C")
-df={'Concentracion[m]':concentraciones}
-df_={columna_k[i]:k[i] for i in range(len(Temps))}
-df={**df,**df_}
-df=pd.DataFrame(df)
-df.to_csv('reportes/datos.csv',index=False)
+col1={'Concentracion[m]':concentraciones}
+col2={columna_k[i]:k[i] for i in range(len(Temps))}
+df={**col1,**col2}
+df_reporte=pd.DataFrame(df)
 #%% BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 n_lista=[]
+err_n_lista=[]
 lambda_na_lista=[]
+err_lambda_na_lista=[]
 def n_test(n,T):
     """Funcion de Debug
     Revisa que |T-T(n)|<1% para asegurarme que calulé bien el n a cada T
@@ -90,17 +97,27 @@ for T in Temps:
         global T
         return -0.28*x+(5.3E5)*(x**(-7/3))+7.5-T
 
-    n = fsolve(f, T) #f=funcion a buscar raiz, T=valor cerce del que buscar
+    n,err_n = leastsq(func=f,x0=T) #f=funcion a buscar raiz, T=valor cerce del que buscar
     
     lambda_na= 22.24+1.135*(T**3)
+    err_lambda_na= abs(3*1.135*T**2)*error_temp
+    
     lambda_na_lista.append(lambda_na)
     n_lista.append(n[0])
+    err_n_lista.append(err_n)
+    err_lambda_na_lista.append(err_lambda_na)
 
-    print(f"{T:<15}{n[0]:<15.8g}{lambda_na:<15.8g}")
+    prinn=f"{n[0]:.6g}pm{err_n:.1g}"
+    prinlambda=f"{lambda_na:.8g}pm{err_lambda_na:.1g}"
+    print(f"{T:<15}{prinn:<15}{prinlambda:<15}")
 print("%"*60,"\n")
 
 #Reporte
-df_reporte=pd.DataFrame({'T[K]':Temps,'n':n_lista,'lambda_Na[uS/cm.molal]':lambda_na_lista})
+df_reporte=pd.DataFrame({
+    'T[K]':Temps,
+    'n':[[n_lista[i],err_n_lista[i]] for i in range(len(n_lista))],
+    'lambda_Na[uS/cm.molal]':[[lambda_na_lista[i],err_lambda_na_lista[i]] for i in range(len(lambda_na_lista))]
+})
 #%% K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -111,32 +128,52 @@ o1_lista=[] #lista con las ordenadas a Cs baja
 o2_lista=[] #lista con las ordenadas a Cs alta
 cmc_lista=[] #lista con las a CMC
 
-print(f"{'T':<8}{'CMC':<15}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
-print(f"{'[K]':<8}{'[molal]':<15}{'uS/cm.molal':<15}{'uS/cm':<15}{'uS/cm.molal':<15}{'uS/cm':<15}")
+#lista de errores
+err_p1_lista=[] 
+err_p2_lista=[] 
+err_o1_lista=[] 
+err_o2_lista=[] 
+err_cmc_lista=[] 
+
+
+print(f"{'T':<8}{'CMC':<19}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
+print(f"{'[K]':<8}{'[umolal]':<19}{'uS/cm.molal':<15}{'uS/cm':<15}{'uS/cm.molal':<15}{'uS/cm':<15}")
 
 for i in range(len(k)):
     #ajuste lineal para Cs<CMC
     medicion_de_corte=6 #divide los datos en 2 series de 6 valores
-    x= concentraciones[:medicion_de_corte].reshape((-1,1))
+    x= np.array(concentraciones[:medicion_de_corte])
     y = np.array(k[i][:medicion_de_corte])
-    model = LinearRegression()
-    model.fit(x, y)
-    pendiente1=model.coef_
-    ordenada1=model.intercept_
-    
+    x = sm.add_constant(x)
+
+    model1 = sm.OLS(y,x).fit()
+    ordenada1,pendiente1= model1.params
+    err_ordenada1, err_pendiente1= model1.bse
+    print_model1= model1.summary()
+    #print(print_model1)
+
     #ajuste lineal para Cs>CMC
-    x2 = concentraciones[medicion_de_corte:].reshape((-1,1))
-    y2 = np.array(k[i][medicion_de_corte:])
-    model.fit(x2, y2)
-    pendiente2=model.coef_
-    ordenada2=model.intercept_
+    x = np.array(concentraciones[medicion_de_corte:])
+    y = np.array(k[i][medicion_de_corte:])
+    x = sm.add_constant(x)
+
+    model2 = sm.OLS(y,x).fit()
+    ordenada2,pendiente2= model2.params
+    err_ordenada2, err_pendiente2= model2.bse
+    print_model2= model2.summary()
+    #print(print_model2)
     
-    p1_lista.append(pendiente1[0])
+    p1_lista.append(pendiente1)
     o1_lista.append(ordenada1)
-    p2_lista.append(pendiente2[0])
+    p2_lista.append(pendiente2)
     o2_lista.append(ordenada2)
+    err_p1_lista.append(pendiente1)
+    err_o1_lista.append(ordenada1)
+    err_p2_lista.append(pendiente2)
+    err_o2_lista.append(ordenada2)
 
     if DEBUG_K_VS_CS==True: 
+        #veo grafico por gráfico
         fig, axes = plt.subplots()
         data=plt.scatter(
                 concentraciones,
@@ -155,18 +192,31 @@ for i in range(len(k)):
         )
     
     CMC=abs(ordenada1-ordenada2)/abs(pendiente1-pendiente2)
+    #propagación de errores
+    variables=p1,p2,o1,o2=sp.symbols('p1,p2,o1,o2',complex=False)
+    errores_variables=ep1,ep2,eo1,eo2=sp.symbols('ep1,ep2,eo1,eo2',complex=False)
+    eq=(o1-o2)/(p1-p2)
+    error=[eq.diff(i) for i in variables]
+    error_propagado=0
+    for i in range(len(variables)):
+        error_propagado+=abs(error[i])*errores_variables[i]
+    #mostrar la formula de propagacion de error
+    #display(error_propagado)
+    evaluar=dict(zip(variables+errores_variables,[pendiente1,pendiente2,ordenada1,ordenada2,err_pendiente1,err_pendiente2,err_ordenada1,err_ordenada2]))
+    err_cmc=error_propagado.evalf(subs=evaluar)
+    err_cmc=float(err_cmc)
     
-    cmc_lista.append(CMC[0])
-
-    print(f"{Temps[i]:<8}{CMC[0]:<15.8g}{pendiente1[0]:<15.8g}{ordenada1:<15.8g}{pendiente2[0]:<15.8g}{ordenada2:<15.8g}")
+    cmc_lista.append(CMC)
+    err_cmc_lista.append(err_cmc)
+    print(f"{Temps[i]:<8}{prinvalor(CMC*1e-3,err_cmc*1e-3):<19}{pendiente1:<15.8g}{ordenada1:<15.8g}{pendiente2:<15.8g}{ordenada2:<15.8g}")
 print('\n','%'*20,'\n')
 
 #Reporte
-df_reporte['CMC[molal]']=cmc_lista
-df_reporte['cmc_pendiente1[uS/(cm.molal)]']=p1_lista
-df_reporte['cmc_ordenada1[molal]']=o1_lista
-df_reporte['cmc_pendiente2[uS/(cm.molal)]']=p2_lista
-df_reporte['cmc_ordenada2[molal]']=o2_lista
+df_reporte['CMC[molal]']=[(cmc_lista[i],err_cmc_lista[i]) for i in range(len(cmc_lista))]
+df_reporte['cmc_pendiente1[uS/(cm.molal)]']=Reporte_valor(p1_lista,err_p1_lista)
+df_reporte['cmc_ordenada1[molal]']=Reporte_valor(o1_lista,err_o1_lista)
+df_reporte['cmc_pendiente2[uS/(cm.molal)]']=Reporte_valor(p2_lista,err_p2_lista)
+df_reporte['cmc_ordenada2[molal]']=Reporte_valor(o2_lista,err_o2_lista)
 #%%Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -234,11 +284,13 @@ plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 #%%Figura una sola serie
 i=3
 fig,axes= plt.subplots()
+
 puntos=sns.scatterplot(
     x=concentraciones,
     y=k[3],
     label=f"T={Temps[3]}K",
 )
+
 #el ajuste lineal a Cs baja
 cc_baja=[concentraciones[0],cmc_lista[3]*1.1]
 y_baja=np.array(cc_baja)*p1_lista[i]+o1_lista[i]
@@ -279,6 +331,7 @@ plt.savefig('figuras/kvsCs_solo.png',dpi=300,bbox_inches='tight')
 #revisé y estan bien los valores 
 print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
 alpha_lista=[]
+err_alpha_lista=[]
 for i in range(len(Temps)):
     n=n_lista[i]
     p1=p1_lista[i]
@@ -300,8 +353,55 @@ for i in range(len(Temps)):
     if imprimo==True:
         print(f"{Temps[i]:<8}{pos:<15.8g}{alfa_neg:<15.8g}{b**2-4*a*c:<15.8g}")
     else:
-        print(f"{Temps[i]:<8}{'!∃ raiz real':<30}{b**2-4*a*c:<15.8g}")
+        print(f"{Temps[i]:<8}{'!∃raiz real':<30}{b**2-4*a*c:<15.8g}")
 
+#%%
+#%%
+# CALCULO ALPHA
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
+variables= n,p1,p2,lambda_na = sp.symbols('n,p1,p2,lambda_na',real=True)
+errores= e_n,e_p1,e_p2,e_lambda_na = sp.symbols('e_n,e_p1,e_p2,e_lambda_na',real=True)
+a=n**(sp.Rational(2,3))*(p1-lambda_na)
+b=lambda_na
+c=-p2
+raiz_p=-b+sp.sqrt(b**2-4*a*c)/(2*a)
+raiz_n=-b-sp.sqrt(b**2-4*a*c)/(2*a)
+#display(a,b,c,raiz_p,raiz_n)
+for i in range(len(Temps)):
+    sub_dict={
+        n:n_lista[i],
+        p1:p1_lista[i],
+        p2:p2_lista[i],
+        lambda_na:lambda_na_lista[i],
+    }
+    pos=(-b+((b**2)-(4*a*c))**(0.5))/(2*a)
+    raiz=(b**2)-(4*a*c)
+    if raiz.evalf(subs=sub_dict)<0:
+        _a=a.evalf(subs=sub_dict)
+        _b=b.evalf(subs=sub_dict)
+        _c=c.evalf(subs=sub_dict)
+        raiz_p=(-_b+((_b**2)-(4*_a*_c))**(0.5))/(2*_a)
+        print(f"{Temps[i]:<8}{'NO RAIZ REAL':<15}")
+    else:
+        alfa=raiz_p.evalf(subs=sub_dict)
+        print(f"{Temps[i]:<8}{float(alfa):<15.8g}")
+    raiz_pos=pos.evalf(subs=sub_dict)
+
+#%%
+    #propagación de errores
+    variables=p1,p2,o1,o2=sp.symbols('p1,p2,o1,o2',complex=False)
+    errores_variables=ep1,ep2,eo1,eo2=sp.symbols('ep1,ep2,eo1,eo2',complex=False)
+    eq=(o1-o2)/(p1-p2)
+    error=[eq.diff(i) for i in variables]
+    error_propagado=0
+    for i in range(len(variables)):
+        error_propagado+=abs(error[i])*errores_variables[i]
+    #mostrar la formula de propagacion de error
+    #display(error_propagado)
+    evaluar=dict(zip(variables+errores_variables,[pendiente1,pendiente2,ordenada1,ordenada2,err_pendiente1,err_pendiente2,err_ordenada1,err_ordenada2]))
+    err_cmc=error_propagado.evalf(subs=evaluar)
 #Reporte
 df_reporte['alfa']=alpha_lista+[np.nan]*2
  #%% Grafico de la cuadratica, me importan los alfas<1
