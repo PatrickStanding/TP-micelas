@@ -18,11 +18,12 @@ from scipy.optimize import leastsq
 import sympy as sp
 
 sns.set_theme(context='paper')#configuro el formato de graficos
-def prinvalor(valor,error):
+def Prinvalor(valor,error):
     return f"{valor:.5g}pm{error:.1g}"
 def Reporte_valor(valor_lista,error_lista):
     return [(valor_lista[i],error_lista[i]) for i in range(len(valor_lista))]
-#%% DATOS
+#%% 
+#DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 R=8.31446261815324 #J/(mol*K)
@@ -50,10 +51,9 @@ k_baja=[[28.9,74.3,106.5,139.5,172.8,232,416,451,515,581,677],
 #junto las dos series de mediciones
 Temps=Temps_baja+Temps
 k=k_baja+k
-#TODO: Completar Errores de las mediciones
 error_temp=0.02
-error_concen=10*0.001/PM_SDS #propacación de error suponiendo Error_cc=10% de la cc mínima
-error_conduct=0.1 #susuce 10% pero tendriamos que haber leido el manual del conductimetro
+error_concen=0.001/PM_SDS 
+error_conduct=0.1 
 
 err_Temps=[error_temp]*(len(Temps))
 
@@ -69,7 +69,8 @@ col1={'Concentracion[m]':concentraciones}
 col2={columna_k[i]:k[i] for i in range(len(Temps))}
 df={**col1,**col2}
 df_reporte=pd.DataFrame(df)
-#%% BUSCO  n y lambda en funcion de T
+#%%
+# BUSCO  n y lambda en funcion de T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 n_lista=[]
@@ -115,10 +116,11 @@ print("%"*60,"\n")
 #Reporte
 df_reporte=pd.DataFrame({
     'T[K]':Temps,
-    'n':[[n_lista[i],err_n_lista[i]] for i in range(len(n_lista))],
-    'lambda_Na[uS/cm.molal]':[[lambda_na_lista[i],err_lambda_na_lista[i]] for i in range(len(lambda_na_lista))]
+    'n':Reporte_valor(n_lista,err_n_lista),
+    'lambda_Na[uS/cm.molal]':Reporte_valor(lambda_na_lista,err_lambda_na_lista)
 })
-#%% K vs Cs
+#%% 
+# K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 DEBUG_K_VS_CS=False
@@ -134,6 +136,10 @@ err_p2_lista=[]
 err_o1_lista=[] 
 err_o2_lista=[] 
 err_cmc_lista=[] 
+ci1_low_list=[]
+ci1_up_list=[]
+ci2_low_list=[]
+ci2_up_list=[]
 
 
 print(f"{'T':<8}{'CMC':<19}{'pendiente1':<15}{'ordenada1':<15}{'pendiente2':<15}{'ordenada2':<15}")
@@ -150,6 +156,10 @@ for i in range(len(k)):
     ordenada1,pendiente1= model1.params
     err_ordenada1, err_pendiente1= model1.bse
     print_model1= model1.summary()
+
+    frame = model1.get_prediction(x).summary_frame(alpha=0.01)
+    ci_1_low=frame.mean_ci_lower
+    ci_1_up=frame.mean_ci_upper
     #print(print_model1)
 
     #ajuste lineal para Cs>CMC
@@ -160,7 +170,11 @@ for i in range(len(k)):
     model2 = sm.OLS(y,x).fit()
     ordenada2,pendiente2= model2.params
     err_ordenada2, err_pendiente2= model2.bse
+
     print_model2= model2.summary()
+    frame = model2.get_prediction(x).summary_frame(alpha=0.01)
+    ci_2_low=frame.mean_ci_lower
+    ci_2_up=frame.mean_ci_upper
     #print(print_model2)
     
     p1_lista.append(pendiente1)
@@ -171,7 +185,11 @@ for i in range(len(k)):
     err_o1_lista.append(ordenada1)
     err_p2_lista.append(pendiente2)
     err_o2_lista.append(ordenada2)
-
+    ci1_low_list.append(ci_1_low)
+    ci1_up_list.append(ci_1_up)
+    ci2_low_list.append(ci_2_low)
+    ci2_up_list.append(ci_2_up)
+    
     if DEBUG_K_VS_CS==True: 
         #veo grafico por gráfico
         fig, axes = plt.subplots()
@@ -208,6 +226,7 @@ for i in range(len(k)):
     
     cmc_lista.append(CMC)
     err_cmc_lista.append(err_cmc)
+
     print(f"{Temps[i]:<8}{prinvalor(CMC*1e-3,err_cmc*1e-3):<19}{pendiente1:<15.8g}{ordenada1:<15.8g}{pendiente2:<15.8g}{ordenada2:<15.8g}")
 print('\n','%'*20,'\n')
 
@@ -217,7 +236,9 @@ df_reporte['cmc_pendiente1[uS/(cm.molal)]']=Reporte_valor(p1_lista,err_p1_lista)
 df_reporte['cmc_ordenada1[molal]']=Reporte_valor(o1_lista,err_o1_lista)
 df_reporte['cmc_pendiente2[uS/(cm.molal)]']=Reporte_valor(p2_lista,err_p2_lista)
 df_reporte['cmc_ordenada2[molal]']=Reporte_valor(o2_lista,err_o2_lista)
-#%%Figuras K vs Cs
+
+#%%
+# Figuras K vs Cs
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
@@ -246,6 +267,7 @@ for cuadrante in [0,1]:
             c=colores[i],
             linestyle='--'
         )
+
         #el ajuste lineal a Cs alta
         cc_alta=[cmc_lista[i]*0.9,concentraciones[-1]]
         y_alta=np.array(cc_alta)*p2_lista[i]+o2_lista[i]
@@ -260,7 +282,7 @@ for cuadrante in [0,1]:
             xlabel="Cs [m]",
             ylabel=r"$\kappa \left[\mu S\right]$"
         )
-#plt.vlines()
+
 axes[1].vlines(
         x=np.array(cmc_lista),
         ymin=[0]*len(cmc_lista),
@@ -270,7 +292,10 @@ axes[1].vlines(
 
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
 axes[0].legend_=None
+
+axes[0].set(title='(1)')
 axes[1].set(
+    title='(2)',
     xlim=[0.0059,0.0073],
     ylim=[200,1010],
     ylabel=None,
@@ -281,7 +306,8 @@ zoom_x_label=[f"{i:.4g}" for i in np.array(cmc_lista)*1e3]
 zoom_x_label[4]=None
 axes[1].set_xticklabels(zoom_x_label,rotation=90)
 plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
-#%%Figura una sola serie
+#%%
+# Figura una sola serie
 i=3
 fig,axes= plt.subplots()
 
@@ -302,6 +328,19 @@ ajuste_1=plt.plot(
     linestyle='--',
     label="ajuste lineal"
 )
+
+ci_baja=plt.plot(
+    concentraciones[:6],
+    ci1_low_list[i][:6],
+    color='grey'
+)
+ci_alta=plt.plot(
+    concentraciones[:6],
+    ci1_up_list[i][:6],
+    color='gray'
+)
+
+
 #el ajuste lineal a Cs alta
 cc_alta=[cmc_lista[i]*0.9,concentraciones[-1]]
 y_alta=np.array(cc_alta)*p2_lista[i]+o2_lista[i]
@@ -312,62 +351,51 @@ ajuste_2=plt.plot(
     c=colores[i],
     linestyle='--'
 )
+ci_baja2=plt.plot(
+    concentraciones[6:],
+    ci2_low_list[i],
+    color='grey'
+)
+ci_alta2=plt.plot(
+    concentraciones[6:],
+    ci2_up_list[i],
+    color='gray',
+    label= r"ci $\alpha=0.05$"
+)
 axes.set(
-    xlabel="Cs [m]",
-    ylabel=r"$\kappa \ \left[\mu S\right/cm]$"
+    xlabel="Cs [\mu m]",
+    ylabel=r"$\kappa \ \left[\mu S \right / cm]$"
 )
 
+
+axes.set_xticks(np.linspace(0,0.025,6),np.linspace(0,0.025,6)*1e3)
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
 
 plt.savefig('figuras/kvsCs_solo.png',dpi=300,bbox_inches='tight')
 
-#%% CALCULO ALPHA
+#%% 
+# CALCULO ALPHA
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 # Y=a*X^2+b*X+c
 # 0<alfa<1  es grado de ionizacion == relacion entre ionizado y no ionizado
-#TODO:Para las ultimas 2 T la cuadrática no tiene raiz,
-#revisé y estan bien los valores 
-print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
+
+# Para las ultimas 2 T la cuadrática no tiene raiz
+
 alpha_lista=[]
 err_alpha_lista=[]
-for i in range(len(Temps)):
-    n=n_lista[i]
-    p1=p1_lista[i]
-    p2=p2_lista[i]
-    lambda_na=lambda_na_lista[i]
-    a=n**(2/3)*(p1-lambda_na)
-    b=lambda_na
-    c=-p2
-    alpha=[(-b+np.sqrt(b**2-4*a*c))/(2*a),(-b-np.sqrt(b**2-4*a*c))/(2*a)]
-    #elijo el alfa>0
-    imprimo=False #variable para imprimir tabla
-    for j in alpha:
-        if j>0:
-            alpha_lista.append(j)
-            pos=j
-            imprimo=True
-        else:
-            alfa_neg=j
-    if imprimo==True:
-        print(f"{Temps[i]:<8}{pos:<15.8g}{alfa_neg:<15.8g}{b**2-4*a*c:<15.8g}")
-    else:
-        print(f"{Temps[i]:<8}{'!∃raiz real':<30}{b**2-4*a*c:<15.8g}")
-
-#%%
-#%%
-# CALCULO ALPHA
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-print(f"{'T[ºC]':<8}{'alfa<0':<15}{'alfa>0':<15}{'-b+4ac':<15}")
+print(f"{'T[ºC]':<8}{'alfa>0':<15}")
 variables= n,p1,p2,lambda_na = sp.symbols('n,p1,p2,lambda_na',real=True)
 errores= e_n,e_p1,e_p2,e_lambda_na = sp.symbols('e_n,e_p1,e_p2,e_lambda_na',real=True)
+
+
 a=n**(sp.Rational(2,3))*(p1-lambda_na)
 b=lambda_na
 c=-p2
 raiz_p=-b+sp.sqrt(b**2-4*a*c)/(2*a)
 raiz_n=-b-sp.sqrt(b**2-4*a*c)/(2*a)
+
 #display(a,b,c,raiz_p,raiz_n)
 for i in range(len(Temps)):
     sub_dict={
@@ -378,34 +406,33 @@ for i in range(len(Temps)):
     }
     pos=(-b+((b**2)-(4*a*c))**(0.5))/(2*a)
     raiz=(b**2)-(4*a*c)
-    if raiz.evalf(subs=sub_dict)<0:
+    if raiz.evalf(subs=sub_dict)>0:
         _a=a.evalf(subs=sub_dict)
         _b=b.evalf(subs=sub_dict)
         _c=c.evalf(subs=sub_dict)
-        raiz_p=(-_b+((_b**2)-(4*_a*_c))**(0.5))/(2*_a)
-        print(f"{Temps[i]:<8}{'NO RAIZ REAL':<15}")
+        raiz_pos=(-_b+((_b**2)-(4*_a*_c))**(0.5))/(2*_a)
+        print(f"{Temps[i]:<8}{float(raiz_pos):<15}")
+
+        #propago error
+        evaluar=dict(zip(variables+errores_variables,[n_lista[i],p1_lista[i],p2_lista[i],lambda_na_lista[i],err_n_lista[i],err_p1_lista[i],err_p2_lista[i],err_lambda_na_lista[i]]))
+        error=[pos.diff(i) for i in variables]
+        error_propagado=0
+        for j in range(len(variables)):
+            error_propagado+=abs(error[j])*errores_variables[j]
+        error_propagado.evalf()
+        #mostrar la formula de propagacion de error
+        #display(error_propagado)
+        err_cmc=error_propagado.evalf(subs=evaluar)
+        alpha_lista.append(raiz_pos)
+        err_alpha_lista.append(err_cmc)
     else:
-        alfa=raiz_p.evalf(subs=sub_dict)
-        print(f"{Temps[i]:<8}{float(alfa):<15.8g}")
-    raiz_pos=pos.evalf(subs=sub_dict)
+        print(f"{Temps[i]:<8}{'no raiz real':<15}")
+
+#Reporte
+df_reporte['alfa']= Reporte_valor(alpha_lista+[np.nan]*2,err_alpha_lista+[np.nan]*2)
 
 #%%
-    #propagación de errores
-    variables=p1,p2,o1,o2=sp.symbols('p1,p2,o1,o2',complex=False)
-    errores_variables=ep1,ep2,eo1,eo2=sp.symbols('ep1,ep2,eo1,eo2',complex=False)
-    eq=(o1-o2)/(p1-p2)
-    error=[eq.diff(i) for i in variables]
-    error_propagado=0
-    for i in range(len(variables)):
-        error_propagado+=abs(error[i])*errores_variables[i]
-    #mostrar la formula de propagacion de error
-    #display(error_propagado)
-    evaluar=dict(zip(variables+errores_variables,[pendiente1,pendiente2,ordenada1,ordenada2,err_pendiente1,err_pendiente2,err_ordenada1,err_ordenada2]))
-    err_cmc=error_propagado.evalf(subs=evaluar)
-#Reporte
-df_reporte['alfa']=alpha_lista+[np.nan]*2
- #%% Grafico de la cuadratica, me importan los alfas<1
-#Figura
+#Figuras : la cuadratica, con raiz=alfa
 fig,ax =plt.subplots()
 minimox,maximox=-1,0.5
 for i in range(len(Temps)):
@@ -439,34 +466,33 @@ ax.set(
 plt.legend(bbox_to_anchor=(1.01,1.05), loc="upper left")
 plt.savefig('figuras/alfa_cuadrativa.png',dpi=300,bbox_inches='tight')
     
-#%% CALCULO Gomic
+#%%
+# CALCULO Gomic
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-#
-#    A PARTIR DE AHORA USO [T]=K
+#  A PARTIR DE AHORA USO [T]=K
+
 Temps=np.array(Temps)+273
 alpha_lista=np.array(alpha_lista)
 cmc_lista=np.array(cmc_lista)
 def Go(T,alfa,CMC):
     global R
     return R*T*(2-alfa)*np.log(CMC)
-Go_lista=[]
 
 Go_lista=Go(
     T=Temps[:-2],
     alfa=alpha_lista,
     CMC=cmc_lista[:-2]
 )
-#quite las experiencias a T donde no pude calcular alfa
-# for i in range(len(Temps[:-2])):
-#     delta_Go_mic=Go(
-#         T=Temps[i],
-#         alfa=alpha_lista[i],
-#         CMC=cmc_lista[i]
-#         )
-#     Go_lista.append(delta_Go_mic)
-#Reporte
+
+#propago error
+def _ErrGo(Go,T,alfa,CMC,eGo,eT,ealfa,eCMC):
+    #lo propagué  amano con derivadas parciales
+    error = abs(Go/T)*eGo + abs(Go/(2-alfa))*ealfa + abs(R*T*(2-alfa)/cmc)*eCMC
+    return error
+
+
 df_reporte['delta_Go[kJ/mol]']=np.append(Go_lista,[np.nan]*2)/1000
 #%% alfa vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
