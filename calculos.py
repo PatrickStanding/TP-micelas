@@ -22,6 +22,18 @@ def Prinvalor(valor,error):
     return f"{valor:.5g}pm{error:.1g}"
 def Reporte_valor(valor_lista,error_lista):
     return [(valor_lista[i],error_lista[i]) for i in range(len(valor_lista))]
+def Plot_CI(X:list,CI_lower:list,CI_upper:list,Color='gray',Transparencia=0.4,Label=''):
+    plt.plot(X,CI_upper,color=Color)
+    plt.plot(X,CI_lower,color=Color)
+    plt.fill_between(
+        x=X,
+        y1=CI_lower,
+        y2=CI_upper,
+        color=Color,
+        alpha=Transparencia,
+        label=Label
+    )
+
 #%% 
 #DATOS
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -227,7 +239,7 @@ for i in range(len(k)):
     cmc_lista.append(CMC)
     err_cmc_lista.append(err_cmc)
 
-    print(f"{Temps[i]:<8}{prinvalor(CMC*1e-3,err_cmc*1e-3):<19}{pendiente1:<15.8g}{ordenada1:<15.8g}{pendiente2:<15.8g}{ordenada2:<15.8g}")
+    print(f"{Temps[i]:<8}{Prinvalor(CMC*1e-3,err_cmc*1e-3):<19}{pendiente1:<15.8g}{ordenada1:<15.8g}{pendiente2:<15.8g}{ordenada2:<15.8g}")
 print('\n','%'*20,'\n')
 
 #Reporte
@@ -311,11 +323,14 @@ plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 i=3
 fig,axes= plt.subplots()
 
-puntos=sns.scatterplot(
+puntos=plt.errorbar(
     x=concentraciones,
-    y=k[3],
+    y=k[i],
+    yerr=err_k[i],
+    fmt='o',
     label=f"T={Temps[3]}K",
 )
+
 
 #el ajuste lineal a Cs baja
 cc_baja=[concentraciones[0],cmc_lista[3]*1.1]
@@ -411,8 +426,7 @@ for i in range(len(Temps)):
         _b=b.evalf(subs=sub_dict)
         _c=c.evalf(subs=sub_dict)
         raiz_pos=(-_b+((_b**2)-(4*_a*_c))**(0.5))/(2*_a)
-        print(f"{Temps[i]:<8}{float(raiz_pos):<15}")
-
+        
         #propago error
         evaluar=dict(zip(variables+errores_variables,[n_lista[i],p1_lista[i],p2_lista[i],lambda_na_lista[i],err_n_lista[i],err_p1_lista[i],err_p2_lista[i],err_lambda_na_lista[i]]))
         error=[pos.diff(i) for i in variables]
@@ -422,9 +436,11 @@ for i in range(len(Temps)):
         error_propagado.evalf()
         #mostrar la formula de propagacion de error
         #display(error_propagado)
-        err_cmc=error_propagado.evalf(subs=evaluar)
-        alpha_lista.append(raiz_pos)
-        err_alpha_lista.append(err_cmc)
+        err_alpha=error_propagado.evalf(subs=evaluar)
+        alpha_lista.append(float(raiz_pos))
+        err_alpha_lista.append(float(err_alpha))
+
+        print(f"{Temps[i]:<8}{float(raiz_pos):<8.6g} +/- {float(err_alpha):.3g}")
     else:
         print(f"{Temps[i]:<8}{'no raiz real':<15}")
 
@@ -487,29 +503,50 @@ Go_lista=Go(
 )
 
 #propago error
-def _ErrGo(Go,T,alfa,CMC,eGo,eT,ealfa,eCMC):
+def ErrGo(Go,T,alfa,CMC,eT,ealfa,eCMC):
     #lo propagué  amano con derivadas parciales
-    error = abs(Go/T)*eGo + abs(Go/(2-alfa))*ealfa + abs(R*T*(2-alfa)/cmc)*eCMC
+    error = abs(Go/T)*eT + abs(Go/(2-alfa))*ealfa + abs(R*T*(2-alfa)/CMC)*eCMC
     return error
 
 
-df_reporte['delta_Go[kJ/mol]']=np.append(Go_lista,[np.nan]*2)/1000
-#%% alfa vs T
+err_go_lista= ErrGo(
+    Go=Go_lista,
+    T=Temps[:-2],
+    alfa=alpha_lista,
+    CMC=cmc_lista[:-2],
+    eT=np.array(err_Temps)[:-2],
+    ealfa=np.array(err_alpha_lista),
+    eCMC=np.array(err_cmc_lista)[:-2]
+)
+
+df_reporte['delta_Go[kJ/mol]']= Reporte_valor(
+    np.append(Go_lista,[np.nan]*2)/1000,
+    np.append(err_go_lista,[np.nan]*2)/1000
+    )
+#%%
+# alfa vsT
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 #hay 2 ajustes linials, alta a T bajos y alfa a T altos
 #el de menor T
 # pendiente=dalfa/dT=[1/T]
 medicion_cambio_pendiente=4
-x= np.array(Temps[:medicion_cambio_pendiente])
-y = np.array(alpha_lista[:medicion_cambio_pendiente])
+x= Temps[:medicion_cambio_pendiente]
+y = alpha_lista[:medicion_cambio_pendiente]
 x = sm.add_constant(x)
 model_menor = sm.OLS(y,x).fit()
-predictions_menor = model_menor.predict(x) 
-ordenada_menor,pendiente_menor= model_menor.params
-err_ordenada_menor, err_pendiente_menor = model_menor.bse
 print_model_menor = model_menor.summary()
 print(print_model_menor)
+
+ordenada_menor,pendiente_menor= model_menor.params
+err_ordenada_menor, err_pendiente_menor = model_menor.bse
+r2_menor=model_menor.rsquared
+
+predictions_menor = model_menor.predict(x) 
+frame = model_menor.get_prediction(x).summary_frame(alpha=0.05)
+ci_1_low=frame.mean_ci_lower
+ci_1_up=frame.mean_ci_upper
+
 
 #el de mayor T
 #el -2 es porque en las últimas 2 temp no pude calcular alfa
@@ -517,10 +554,18 @@ x= np.array(Temps[medicion_cambio_pendiente-1:-2])
 y = np.array(alpha_lista[medicion_cambio_pendiente-1:])
 x = sm.add_constant(x)
 model_mayor = sm.OLS(y,x).fit()
-predictions_mayor = model_mayor.predict(x) 
 print_model_mayor = model_mayor.summary()
+
 ordenada_mayor, pendiente_mayor= model_mayor.params
 err_ordenada_mayor, err_pendiente_mayor = model_mayor.bse
+r2_mayor=model_mayor.rsquared
+
+predictions_mayor = model_mayor.predict(x) 
+
+x_ci_mayor=np.linspace(x[0][1],x[-1][1],50)
+frame = model_mayor.get_prediction(sm.add_constant(x_ci_mayor)).summary_frame(alpha=0.05)
+ci_2_low=frame.mean_ci_lower
+ci_2_up=frame.mean_ci_upper
 
 
 #voy a tener 2 pendintes dalfa/dT, una para T<25 y otra pra T>25
@@ -531,29 +576,48 @@ dalfa_dT_sob25=err_pendiente_mayor
 err_dalfa_dT_sob25=err_pendiente_mayor
 
 dalfa_dT_lista=np.array([dalfa_dT_sub25]*3+[dalfa_dT_sob25]*3)
+err_dalfa_dT_lista=np.array([err_dalfa_dT_sub25]*3+[err_dalfa_dT_sob25]*3)
 print(print_model_menor)
 
 #Reportes
+
 #TODO exportar los resultados del ajuste cuadrático
-df_reporte["dalfa_dT[1/K]"]=np.append(dalfa_dT_lista,[np.nan]*2)
+df_reporte["dalfa_dT[1/K]"]=Reporte_valor(
+    np.append(dalfa_dT_lista,[np.nan]*2),
+    np.append(err_dalfa_dT_lista,[np.nan]*2))
 #%%
 fig,axes = plt.subplots()
 sns.scatterplot(
     x=Temps[:-2],
-    y=alpha_lista
+    y=alpha_lista,
+    zorder=20,
 )
 plt.plot(
     Temps[:medicion_cambio_pendiente],
     predictions_menor,
     ls='--',
-    #label=r'$\alpha=$'+f'{redondeo(pendiente_menor,err_pendiente_menor)}T{redondeo(ordenada_menor,err_ordenada_menor)}'
+    zorder=20,
+    label=f'Ajuste lineal a T bajas  $R^2=${r2_menor:.2g}'
+)
+
+Plot_CI(
+    X=Temps[:4],
+    CI_lower=ci_1_low,
+    CI_upper=ci_1_up
 )
 plt.plot(
     Temps[medicion_cambio_pendiente-1:-2],
     predictions_mayor,
     ls='--',
-    #label=r'$\alpha=$'+f"{pendiente_mayor}{err_pendiente_mayor}T{ordenada_menor}{err_ordenada_menor}'"
+    label=f'Ajuste lineal a T bajas  $R^2=${r2_mayor:.2g}'
 )
+Plot_CI(
+    X=x_ci_mayor,
+    CI_lower=ci_2_low,
+    CI_upper=ci_2_up
+)
+
+
 axes.set(
     xlabel="T [ºC]",
     ylabel=r"$\alpha$"
