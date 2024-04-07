@@ -703,15 +703,10 @@ def calculo_S(T:np.ndarray,H:np.ndarray,G:np.ndarray):
 def ERROR_H(H,T,alfa,dlncmc_dt,dalfa_dt,lncmc,cmc,eT,ealfa,edlncmc_dt,edalfa_dt,ecmc):
     global R
     eH= abs(2*H/T)*eT
-    print(eH,1)
     eH+= abs(R*T**2*dlncmc_dt)*ealfa 
-    print(eH,2)
     eH+= abs(-R*T**2*(2-alfa))*edlncmc_dt
-    print(eH,3)
     eH+= abs(R*T**2*lncmc)*edalfa_dt
-    print(eH,4)
     eH+= abs(R*T**2*dalfa_dt/cmc)*ecmc
-    print(eH,5)
     return eH
 
 def ERROR_S(T,H,G,eT,eH,eG):
@@ -761,12 +756,17 @@ err_S_lista=ERROR_S(
 
 
 # Lo paso todo a Kj/mol
-
+Go_lista=Go_lista
 Go_lista*=1e-3
+err_go_lista=err_go_lista
 err_go_lista*=1e-3
+S_lista=S_lista
 S_lista*=1e-3
+err_S_lista=err_S_lista
 err_S_lista*=1e-3
+H_lista=H_lista
 H_lista*=1e-3
+err_H_lista=err_H_lista
 err_H_lista*=1e-3
 
 print(f"{'Temp':>22}{'dG':>22}{'dH':>22}{'dS':>22}")
@@ -774,10 +774,18 @@ print(f"{'K':>22}{'KJ/mol':>22}{'KJ/mol':>22}{'KJ/mol':>22}")
 for i in range(len(Temps[:-2])):
     print(f"{Temps[i]:>22}{Prinvalor(Go_lista[i],err_go_lista[i]):>22}{Prinvalor(H_lista[i],err_H_lista[i]):>22}{Prinvalor(S_lista[i],err_S_lista[i]):>22}")
 
+
+Go=np.mean(Go_lista)
+err_Go=np.std(Go_lista)
+
+print(f"\nGo= {Go:.1f} pm {err_Go:.1g}")
 #Reporte
 df_reporte['dH[KJ/mol]']=Reporte_valor(np.append(H_lista,[np.nan]*2),np.append(err_H_lista,[np.nan]*2))
 df_reporte['dS[KJ/K.mol]']=Reporte_valor(np.append(S_lista,[np.nan]*2),np.append(err_S_lista,[np.nan]*2))
-# %% Figura termo vs T
+# %%
+# Figura termo vs T
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
 
 Tnuestro=Temps[3:-2]
@@ -853,6 +861,14 @@ axes[1].set(
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 # %%Reportes (ignorar)
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 df_reporte.to_csv('reportes/valores.csv')
 tex='reportes/datos.txt'
@@ -867,3 +883,98 @@ etex.variable(
 )
 
 # %%
+# Exportar datos a latex
+def redondeo(numero,error,debug=False):
+    if error<numero:#error<1:
+        
+        #busco en que decimal está la primer cifra siginificativa del error
+        err_str=str(error).split('.')[1]
+        decimal=0
+        for i in err_str:
+            if i!='0':
+                break
+                if debug==True:
+                    print(i)
+                decimal+=1
+            decimal+=1
+        decimal+=1
+    
+        return f"{np.round(numero,decimal)}"+r" $\pm$ "f"{np.round(error,decimal)}"
+    else:
+        return f"{numero:.2g}"+r" $\pm$ "f"{error:.1g}"
+
+#%%
+def Tabla_Latex(df:pd.DataFrame,label:str,caption:str,alineado='c',):
+    n_row=len(df.axes[0])
+    n_col=len(df.axes[1])
+    columns=df.columns
+
+    #las partes de la tabla
+    pattern0='''\\begin{table}[]\n\\centering\n\\begin{tabular}{@{}'''+alineado*n_col
+    pattern1='@{}}\n\\toprule\n'
+    pattern2=''
+
+    pattern3="\\end{tabular}\n\\label{tab:"+label+"}\n\\end{table}" 
+    if caption!=None:
+        pattern3= "\n\\end{tabular}\n\\caption{"+caption+"}\n\\label{tab:"
+        pattern3+= label+"}\n\\end{table}"
+    
+
+    #las columnas de la tabla
+    for i in range(n_col):
+        if i==n_col-1:
+            pattern2+=columns[i]+" \\\\ \\midrule\n"
+        else:
+            pattern2+=columns[i]+" & "
+
+    #el contenido de la tabla 
+    content=[]
+    for row in range(n_row):
+        row_content=''
+        for columna in columns: 
+            index=df.index[row]
+            cell=df[columna].iloc[row]
+            temp_row=str(cell)+" & "
+            if columna==columns[-1]:
+                temp_row=str(cell)+" \\\\"
+            row_content+=temp_row
+                
+        content.append(row_content)
+    
+    
+    table_body=''
+    stop=len(content)-1
+    for i in range(len(content)):
+        table_body+=content[i]
+        if i == stop:
+            table_body+=" \\bottomrule"
+
+        table_body+='\n'
+    output=pattern0+pattern1+pattern2+table_body+pattern3
+    print(output)
+    
+#%%
+#tabla CMC
+
+export_cmc=[redondeo(cmc_lista[i]*1000,err_cmc_lista[i]*1000) for i in range(len(cmc_lista))]
+df_cmc=pd.DataFrame({
+    'T [K]':Temps,
+    'CMC [$\\frac{mg}{L}$]':export_cmc,
+
+})
+
+Tabla_Latex(df_cmc,label='cmc',caption="valores de CMC calculados")
+# tabla termo
+#%%
+export_go=[redondeo(Go_lista[i],err_go_lista[i]) for i in range(len(Go_lista))]
+export_H=[redondeo(H_lista[i],err_H_lista[i]) for i in range(len(H_lista))]
+export_S=[redondeo(S_lista[i],err_S_lista[i]) for i in range(len(S_lista))]
+export_termo=pd.DataFrame({
+    "T [K]":Temps[:-2],
+    "$\\Delta_{\\text{mic}}G^0 [KJ/mol]$":export_go,
+    "$\\Delta_{\\text{mic}}H^0 [KJ/mol]$":export_H,
+    "$\\Delta_{\\text{mic}}S^0 [KJ/mol]$":export_S,
+
+})
+
+Tabla_Latex(export_termo,label='termo',caption='Parámetros termodinámicos calulados')
