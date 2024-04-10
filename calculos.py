@@ -9,11 +9,11 @@ import numpy as np
 from scipy.optimize import fsolve
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
+#from sklearn.linear_model import LinearRegression
 import seaborn as sns
 import statsmodels.api as sm
 import pandas as pd
-from my_libs import exportador_latex as etex
+#from my_libs import exportador_latex as etex
 from scipy.optimize import leastsq
 import sympy as sp
 
@@ -122,7 +122,7 @@ print("%"*60,"\n")
 
 #Reporte
 df_reporte=pd.DataFrame({
-    'T[K]':Temps,
+    'T[ºC]':Temps,
     'n':Reporte_valor(n_lista,err_n_lista),
     'lambda_Na[uS/cm.molal]':Reporte_valor(lambda_na_lista,err_lambda_na_lista)
 })
@@ -769,10 +769,10 @@ H_lista*=1e-3
 err_H_lista=err_H_lista
 err_H_lista*=1e-3
 
-print(f"{'Temp':>22}{'dG':>22}{'dH':>22}{'dS':>22}")
-print(f"{'K':>22}{'KJ/mol':>22}{'KJ/mol':>22}{'KJ/mol':>22}")
+print(f"{'Temp':>22}{'dG':>22}{'dH':>22}{'dS':>22}{'T.dS':>22}")
+print(f"{'K':>22}{'KJ/mol':>22}{'KJ/mol':>22}{'KJ/K.mol':>22}{'KJ/mol':>22}")
 for i in range(len(Temps[:-2])):
-    print(f"{Temps[i]:>22}{Prinvalor(Go_lista[i],err_go_lista[i]):>22}{Prinvalor(H_lista[i],err_H_lista[i]):>22}{Prinvalor(S_lista[i],err_S_lista[i]):>22}")
+    print(f"{Temps[i]:>22}{Prinvalor(Go_lista[i],err_go_lista[i]):>22}{Prinvalor(H_lista[i],err_H_lista[i]):>22}{Prinvalor(S_lista[i],err_S_lista[i]):>22}{Prinvalor(S_lista[i]*Temps[i],Temps[i]*err_S_lista[i]):>22}")
 
 
 Go=np.mean(Go_lista)
@@ -860,7 +860,8 @@ axes[1].set(
     title="[2]"
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
-# %%Reportes (ignorar)
+#%%
+# Reportes (ignorar)
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -873,14 +874,14 @@ plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 df_reporte.to_csv('reportes/valores.csv')
 tex='reportes/datos.txt'
 
-cmc=df_reporte*1e-3
-variable_name='cmc_'+df_reporte['T[K]'].astype(str)
-variable=df_reporte['CMC[molal]']
-etex.variable(
-    tex,
-    variable_name,
-    variable
-)
+# cmc=df_reporte*1e-3
+# variable_name='cmc_'+df_reporte['T[K]'].astype(str)
+# variable=df_reporte['CMC[molal]']
+# etex.variable(
+#     tex,
+#     variable_name,
+#     variable
+# )
 
 # %%
 # Exportar datos a latex
