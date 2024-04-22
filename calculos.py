@@ -107,7 +107,7 @@ for T in Temps:
 
     n,err_n = leastsq(func=f,x0=T) #f=funcion a buscar raiz, T=valor al partir del cual itera posibles soluciones
     
-    lambda_na= 22.24+1.135*(T**3)
+    lambda_na= 22.24+1.135*T
     err_lambda_na= abs(3*1.135*T**2)*error_temp
     
     lambda_na_lista.append(lambda_na)
@@ -385,6 +385,7 @@ plt.savefig('figuras/kvsCs_solo.png',dpi=300,bbox_inches='tight')
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
+
 # Y=a*X^2+b*X+c
 # 0<alfa<1  es grado de ionizacion == relacion entre ionizado y no ionizado
 
@@ -437,12 +438,12 @@ for i in range(len(Temps)):
         print(f"{Temps[i]:<8}{'no raiz real':<15}")
 
 #Reporte
-df_reporte['alfa']= Reporte_valor(alpha_lista+[np.nan]*2,err_alpha_lista+[np.nan]*2)
+df_reporte['alfa']= Reporte_valor(alpha_lista,err_alpha_lista)
 
 #%%
 #Figuras : la cuadratica, con raiz=alfa
 fig,ax =plt.subplots()
-minimox,maximox=-1,0.5
+minimox,maximox=-0.5,0.5
 for i in range(len(Temps)):
     n=n_lista[i]
     p1=p1_lista[i]
@@ -464,7 +465,7 @@ for i in range(len(Temps)):
         label=f"T={Temps[i]}"
     ).set(
         xlim=[minimox,maximox],
-        ylim=[-.25E6,.25E6]
+        ylim=[-7E4,9E4]
     )
     plt.hlines(xmin=minimox,xmax=maximox,y=0,color='grey',zorder=1,linewidth=0.2)
 ax.set(
