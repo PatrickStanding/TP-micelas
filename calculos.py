@@ -59,16 +59,16 @@ k=[[28,111.4,160,217,279,403,653,703,775,908,1058],
    [48.7,201,289,389,501,782,1310,1409,1547,1836,2110]
 ] #micro Siemes /cm
 
-# Valores a CC_bajas
-Temps_baja=[10,15,20]
-k_baja=[[28.9,74.3,106.5,139.5,172.8,232,416,451,515,581,677],
-        [32,84.5,120.1,158.2,197.5,269,473,516,591,666,782],
-        [35.18,94.37,134.5,176.7,220,306,527,576,661,746,878]
-]
-
-#junto las dos series de mediciones
-Temps=Temps_baja+Temps
-k=k_baja+k
+## Valores a CC_bajas
+#Temps_baja=[10,15,20]
+#k_baja=[[28.9,74.3,106.5,139.5,172.8,232,416,451,515,581,677],
+#        [32,84.5,120.1,158.2,197.5,269,473,516,591,666,782],
+#        [35.18,94.37,134.5,176.7,220,306,527,576,661,746,878]
+#]
+#
+##junto las dos series de mediciones
+#Temps=Temps_baja+Temps
+#k=k_baja+k
 error_temp=0.02
 error_concen=0.001/PM_SDS 
 error_conduct=0.1 
@@ -108,7 +108,7 @@ for T in Temps:
     n,err_n = leastsq(func=f,x0=T) #f=funcion a buscar raiz, T=valor al partir del cual itera posibles soluciones
     
     lambda_na= 22.24+1.135*T
-    err_lambda_na= abs(3*1.135*T**2)*error_temp
+    err_lambda_na= abs(1.135)*error_temp
     
     lambda_na_lista.append(lambda_na)
     n_lista.append(n[0])
@@ -241,7 +241,7 @@ for i in range(len(k)):
     cmc_lista.append(CMC)
     err_cmc_lista.append(err_cmc)
 
-    print(f"{Temps[i]:<8}{Prinvalor(CMC*1e3,err_cmc*1e3):<20}{r2_menor:<10.3g}{Prinvalor(pendiente1,err_pendiente1):<20}{Prinvalor(ordenada1,err_ordenada1):<20}{r2_mayor:<10.3g}{Prinvalor(pendiente2,err_pendiente2):<20}{Prinvalor(ordenada2,err_ordenada2):<20}")
+    print(f"{Temps[i]:<8}{Prinvalor(CMC*1e3,err_cmc*1e3):<20}{r2_menor:<10.3f}{Prinvalor(pendiente1,err_pendiente1):<20}{Prinvalor(ordenada1,err_ordenada1):<20}{r2_mayor:<10.3g}{Prinvalor(pendiente2,err_pendiente2):<20}{Prinvalor(ordenada2,err_ordenada2):<20}")
 print('\n','%'*20,'\n')
 
 #Reporte
@@ -292,10 +292,7 @@ for cuadrante in [0,1]:
             c=colores[i],
             linestyle='--'
         )
-        axes[cuadrante].set(
-            xlabel="Cs [m]",
-            ylabel=r"$\kappa \left[\mu S\right]$"
-        )
+
 
 axes[1].vlines(
         x=np.array(cmc_lista),
@@ -307,17 +304,25 @@ axes[1].vlines(
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
 axes[0].legend_=None
 
-axes[0].set(title='(1)')
+axes[0].set(
+    title='(1)',
+    xticks=np.arange(0,0.03,0.005),
+    xticklabels=np.arange(0,0.03,0.005)*1000,
+    ylabel=r"$\kappa \left[\mu S\right]$",
+    xlabel=r"$Cs \ [m mol/Kg]$"
+    )
+
+zoom_ofset=0.007 #porcentaje
 axes[1].set(
     title='(2)',
-    xlim=[0.0059,0.0073],
+    xlim=[min(cmc_lista)*(1-zoom_ofset),max(cmc_lista)*(1+zoom_ofset)],
     ylim=[200,1010],
     ylabel=None,
     xticks=cmc_lista,
-    xlabel="$Cs \ [m10^{-3}]$"
+    xlabel="$Cs \ [mmol/Kg]$"
     )
 zoom_x_label=[f"{i:.4g}" for i in np.array(cmc_lista)*1e3]
-zoom_x_label[4]=None
+zoom_x_label[0]+='\n'
 axes[1].set_xticklabels(zoom_x_label,rotation=90)
 plt.savefig('figuras/kvsCs.png',dpi=300,bbox_inches='tight')
 #%%
@@ -370,8 +375,8 @@ ci_1=Plot_CI(
     Transparencia=0.2
 )
 axes.set(
-    xlabel="Cs [\mu m]",
-    ylabel=r"$\kappa \ \left[\mu S \right / cm]$"
+    xlabel="Cs $[\mu m]$",
+    ylabel=r"$\kappa \ [ \mu S / cm]$"
 )
 
 
@@ -474,7 +479,23 @@ ax.set(
 )
 plt.legend(bbox_to_anchor=(1.01,1.05), loc="upper left")
 plt.savefig('figuras/alfa_cuadrativa.png',dpi=300,bbox_inches='tight')
-    
+#%%
+fig,axes = plt.subplots()
+tamaño_vertical=0.1
+for i in range(len(alpha_lista)):
+    plt.plot(alpha_lista[i],i,'o',zorder=20)
+    plt.hlines(y=i,xmin=alpha_lista[i]-err_alpha_lista[i],xmax=alpha_lista[i]+err_alpha_lista[i])
+    plt.vlines(x=alpha_lista[i]-err_alpha_lista[i],ymin=i-tamaño_vertical,ymax=i+tamaño_vertical)
+    plt.vlines(x=alpha_lista[i]+err_alpha_lista[i],ymin=i-tamaño_vertical,ymax=i+tamaño_vertical)
+
+axes.set(
+    xlabel=r"$\alpha$",
+    yticks=[0,1,2,3,4],
+    yticklabels=Temps,
+    ylabel="T [ºC]",
+    xticks=alpha_lista
+)
+axes.set_xticklabels([round(i,3) for i in alpha_lista],rotation=-90)
 #%%
 # CALCULO Gomic
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -490,9 +511,9 @@ def Go(T,alfa,CMC):
     return R*T*(2-alfa)*np.log(CMC)
 
 Go_lista=Go(
-    T=Temps[:-2],
+    T=Temps,
     alfa=alpha_lista,
-    CMC=cmc_lista[:-2]
+    CMC=cmc_lista
 )
 
 #propago error
@@ -504,12 +525,12 @@ def ErrGo(Go,T,alfa,CMC,eT,ealfa,eCMC):
 
 err_go_lista= ErrGo(
     Go=Go_lista,
-    T=Temps[:-2],
+    T=Temps,
     alfa=alpha_lista,
-    CMC=cmc_lista[:-2],
-    eT=np.array(err_Temps)[:-2],
+    CMC=cmc_lista,
+    eT=np.array(err_Temps),
     ealfa=np.array(err_alpha_lista),
-    eCMC=np.array(err_cmc_lista)[:-2]
+    eCMC=np.array(err_cmc_lista)
 )
 
 
@@ -517,8 +538,8 @@ print(f"Go [J/mol]")
 for i in range(len(Go_lista)):
     print(f"{Go_lista[i]:.4g} pm {err_go_lista[i]:.1g}")
 df_reporte['delta_Go[kJ/mol]']= Reporte_valor(
-    np.append(Go_lista,[np.nan]*2)/1000,
-    np.append(err_go_lista,[np.nan]*2)/1000
+    Go_lista/1000,
+    err_go_lista/1000
     )
 #%%
 # alfa vsT
@@ -527,7 +548,7 @@ df_reporte['delta_Go[kJ/mol]']= Reporte_valor(
 #hay 2 ajustes linials, alta a T bajos y alfa a T altos
 #el de menor T
 # pendiente=dalfa/dT=[1/T]
-medicion_cambio_pendiente=4
+medicion_cambio_pendiente=2
 x= Temps[:medicion_cambio_pendiente]
 y = alpha_lista[:medicion_cambio_pendiente]
 x = sm.add_constant(x)
@@ -539,16 +560,15 @@ ordenada_menor,pendiente_menor= model_menor.params
 err_ordenada_menor, err_pendiente_menor = model_menor.bse
 r2_menor=model_menor.rsquared
 
-predictions_menor = model_menor.predict(x) 
-frame = model_menor.get_prediction(x).summary_frame(alpha=0.05)
+x_ci_menor=np.linspace(Temps[0],Temps[medicion_cambio_pendiente],100)
+frame = model_menor.get_prediction(sm.add_constant(x_ci_menor)).summary_frame(alpha=0.01)
 ci_1_low=frame.mean_ci_lower
 ci_1_up=frame.mean_ci_upper
 
-
 #el de mayor T
 #el -2 es porque en las últimas 2 temp no pude calcular alfa
-x= np.array(Temps[medicion_cambio_pendiente-1:-2])
-y = np.array(alpha_lista[medicion_cambio_pendiente-1:])
+x= np.array(Temps[medicion_cambio_pendiente:])
+y = np.array(alpha_lista[medicion_cambio_pendiente:])
 x = sm.add_constant(x)
 model_mayor = sm.OLS(y,x).fit()
 print_model_mayor = model_mayor.summary()
@@ -557,59 +577,71 @@ ordenada_mayor, pendiente_mayor= model_mayor.params
 err_ordenada_mayor, err_pendiente_mayor = model_mayor.bse
 r2_mayor=model_mayor.rsquared
 
-predictions_mayor = model_mayor.predict(x) 
-
-x_ci_mayor=np.linspace(x[0][1],x[-1][1],50)
-frame = model_mayor.get_prediction(sm.add_constant(x_ci_mayor)).summary_frame(alpha=0.05)
-ci_2_low=frame.mean_ci_lower
-ci_2_up=frame.mean_ci_upper
-
 
 #voy a tener 2 pendintes dalfa/dT, una para T<25 y otra pra T>25
 #los pongo en la lista dalfa_dT_lista que está emparejada con la Temps
 dalfa_dT_sub25=pendiente_menor
 err_dalfa_dT_sub25=err_pendiente_menor
-dalfa_dT_sob25=err_pendiente_mayor
+dalfa_dT_sob25=pendiente_mayor
 err_dalfa_dT_sob25=err_pendiente_mayor
 
-dalfa_dT_lista=np.array([dalfa_dT_sub25]*3+[dalfa_dT_sob25]*3)
-err_dalfa_dT_lista=np.array([err_dalfa_dT_sub25]*3+[err_dalfa_dT_sob25]*3)
+dalfa_dT_lista=np.array([dalfa_dT_sub25]*len(Temps[:medicion_cambio_pendiente])+[dalfa_dT_sob25]*len(Temps[medicion_cambio_pendiente:]))
+err_dalfa_dT_lista=np.array([err_dalfa_dT_sub25]*len(Temps[:medicion_cambio_pendiente])+[err_dalfa_dT_sob25]*len(Temps[medicion_cambio_pendiente:]))
 print(print_model_menor)
 
+#intersección
+
+Tinterseccion=(ordenada_mayor-ordenada_menor)/(-pendiente_mayor+pendiente_menor)
+predictions_menor=model_menor.predict(sm.add_constant([Temps[0],Tinterseccion]))
+predictions_mayor = model_mayor.predict(sm.add_constant([Tinterseccion,Temps[-1]])) 
+
+x_ci_mayor=np.linspace(Tinterseccion,x[-1][1],50)
+frame = model_mayor.get_prediction(sm.add_constant(x_ci_mayor)).summary_frame(alpha=0.05)
+ci_2_low=frame.mean_ci_lower
+ci_2_up=frame.mean_ci_upper
 #Reportes
 
 #TODO exportar los resultados del ajuste cuadrático
 df_reporte["dalfa_dT[1/K]"]=Reporte_valor(
-    np.append(dalfa_dT_lista,[np.nan]*2),
-    np.append(err_dalfa_dT_lista,[np.nan]*2))
+    dalfa_dT_lista,
+    err_dalfa_dT_lista)
 #%%
 # Figura alfa vs T
 fig,axes = plt.subplots()
 plt.errorbar(
-    x=Temps[:-2],
+    x=Temps,
     y=alpha_lista,
     yerr=err_alpha_lista,
     fmt='x',
     zorder=20,
 )
+
+etiqueta_menor=f'Ajuste lineal a T bajas $R^2=${r2_menor:.3f}\t'
+etiqueta_menor+=r"$\frac{\partial \alpha}{\partial T}=$"+f"{dalfa_dT_sub25:.1e}"
+etiqueta_menor+=" "+r"$T^{-1}$"
 plt.plot(
-    Temps[:medicion_cambio_pendiente],
+    [Temps[0],Tinterseccion],
     predictions_menor,
     ls='--',
     zorder=20,
-    label=f'Ajuste lineal a T bajas  $R^2=${r2_menor:.2g}'
+    label=etiqueta_menor
 )
 
-Plot_CI(
-    X=Temps[:4],
-    CI_lower=ci_1_low,
-    CI_upper=ci_1_up
-)
+#no puedo calcular CI para regresión con 2 valores
+# Plot_CI(
+#     X=Temps[:medicion_cambio_pendiente],
+#     CI_lower=ci_1_low,
+#     CI_upper=ci_1_up
+# )
+etiqueta_mayor=f'Ajuste lineal a T altas  $R^2=${r2_mayor:.3f}\t'
+etiqueta_mayor+=r"$\frac{\partial \alpha}{\partial T}=$"+f"{dalfa_dT_sob25:.1e}"
+etiqueta_mayor+=r"$\pm$"+f"{err_dalfa_dT_sob25:.1g} "+r"$T^{-1}$"
+
 plt.plot(
-    Temps[medicion_cambio_pendiente-1:-2],
+    [Tinterseccion,Temps[-1]],
     predictions_mayor,
     ls='--',
-    label=f'Ajuste lineal a T bajas  $R^2=${r2_mayor:.2g}'
+    label=etiqueta_mayor
 )
 Plot_CI(
     X=x_ci_mayor,
@@ -619,11 +651,11 @@ Plot_CI(
 
 
 axes.set(
-    xlabel="T [ºC]",
-    ylabel=r"$\alpha$",
-    ylim=[-0.2,0.5]
+    xlabel="T [K]",
+    ylabel=r"$\alpha$"
 )
-plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+plt.legend(#bbox_to_anchor=(1,1),
+           loc='upper left')
 plt.savefig('figuras/alfavst.png',dpi=300,bbox_inches='tight')
 #%% ln(CMC) vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -635,12 +667,12 @@ def dlncmc_dt(T,A,B,C):
     #d/dT del ajuste
     return B-C/T**2
 ln_cmc=np.log(cmc_lista)
-err_lncmc_lista=(1/cmc_lista)*err_cmc_lista
+err_lncmc_lista=abs(1/cmc_lista)*err_cmc_lista
 
 param_pol_CMC,covar_pol_CMC= curve_fit(
     pol_CMC,
-    Temps[3:],
-    ln_cmc[3:],
+    Temps,
+    ln_cmc,
     #sigma=err_lncmc_lista[3:],
     #absolute_sigma=True
     )
@@ -652,15 +684,15 @@ dlnCMC_dT_lista = dlncmc_dt(np.array(Temps),*param_pol_CMC)
 # Figura ln(CMC) vs T
 fig,axes=plt.subplots()
 
-plt.errorbar(
-    x=Temps[:3],
-    y=ln_cmc[:3],
-    yerr=err_lncmc_lista[:3],
-    fmt='o',
-    color='red',
-    zorder=10,
-    label='datos descartados'
-)
+# plt.errorbar(
+#     x=Temps[:3],
+#     y=ln_cmc[:3],
+#     yerr=err_lncmc_lista[:3],
+#     fmt='o',
+#     color='red',
+#     zorder=10,
+#     label='datos descartados'
+# )
 plt.errorbar(
     x=Temps,
     y=ln_cmc,
@@ -668,7 +700,7 @@ plt.errorbar(
     fmt='o'
 )
 plt.plot(
-    np.linspace(Temps[3],Temps[-1],20),
+    np.linspace(Temps[0],Temps[-1],20),
     pol_CMC(np.linspace(Temps[0],Temps[-1],20),*param_pol_CMC),
     linestyle='--',
     label=r"$CMC=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g} B={param_pol_CMC[1]:.4g} C={param_pol_CMC[2]:.4g}"
@@ -717,39 +749,39 @@ def ERROR_S(T,H,G,eT,eH,eG):
     return eS
 
 H_lista=calculo_H(
-    T=Temps[:-2],
+    T=Temps,
     alpha=alpha_lista,
-    dlncmc_dt=dlnCMC_dT_lista[:-2],
+    dlncmc_dt=np.array(dlnCMC_dT_lista),
     dalfa_dT=dalfa_dT_lista,
-    ln_cmc=ln_cmc[:-2]
+    ln_cmc=ln_cmc
 )
 
 err_H_lista= ERROR_H(
     H=H_lista,
-    T=Temps[:-2],
+    T=Temps,
     alfa=alpha_lista,
-    dlncmc_dt=dlnCMC_dT_lista[:-2],
+    dlncmc_dt=dlnCMC_dT_lista,
     dalfa_dt=dalfa_dT_lista,
-    lncmc=ln_cmc[:-2],
-    cmc=cmc_lista[:-2],
-    eT=np.array(err_Temps)[:-2],
+    lncmc=ln_cmc,
+    cmc=cmc_lista,
+    eT=np.array(err_Temps),
     ealfa=np.array(err_alpha_lista),
-    edlncmc_dt=(1/cmc_lista[:-2])*np.array(err_cmc_lista[:-2]),
+    edlncmc_dt=(1/cmc_lista)*np.array(err_cmc_lista),
     edalfa_dt=np.array(err_dalfa_dT_lista),
-    ecmc=np.array(err_cmc_lista[:-2])
+    ecmc=np.array(err_cmc_lista)
 )
 
 S_lista=calculo_S(
-    T=np.array(Temps)[:-2],
+    T=Temps,
     G=Go_lista,
     H=H_lista
 )
 
 err_S_lista=ERROR_S(
-    T=Temps[:-2],
+    T=Temps,
     G=Go_lista,
     H=H_lista,
-    eT=err_Temps[:-2],
+    eT=err_Temps,
     eG=err_go_lista,
     eH=err_H_lista
 )
@@ -770,97 +802,145 @@ H_lista*=1e-3
 err_H_lista=err_H_lista
 err_H_lista*=1e-3
 
-print(f"{'Temp':>22}{'dG':>22}{'dH':>22}{'dS':>22}{'T.dS':>22}")
-print(f"{'K':>22}{'KJ/mol':>22}{'KJ/mol':>22}{'KJ/K.mol':>22}{'KJ/mol':>22}")
-for i in range(len(Temps[:-2])):
-    print(f"{Temps[i]:>22}{Prinvalor(Go_lista[i],err_go_lista[i]):>22}{Prinvalor(H_lista[i],err_H_lista[i]):>22}{Prinvalor(S_lista[i],err_S_lista[i]):>22}{Prinvalor(S_lista[i]*Temps[i],Temps[i]*err_S_lista[i]):>22}")
+
+TxS_lista=Temps*S_lista
+err_TxS_lista=Temps*err_S_lista+abs(S_lista)*err_Temps
+
+print(f"{'Temp':<10}{'dG':<22}{'dH':<22}{'dS':<22}{'T.dS':<22}")
+print(f"{'K':<10}{'KJ/mol':<22}{'KJ/mol':<22}{'KJ/K.mol':<22}{'KJ/mol':<22}")
+for i in range(len(Temps)):
+    print(f"{Temps[i]:<10}{Prinvalor(Go_lista[i],err_go_lista[i]):<22}{Prinvalor(H_lista[i],err_H_lista[i]):<22}{Prinvalor(S_lista[i],err_S_lista[i]):<22}{Prinvalor(TxS_lista[i],err_TxS_lista[i]):<22}")
 
 
 Go=np.mean(Go_lista)
 err_Go=np.std(Go_lista)
 
 print(f"\nGo= {Go:.1f} pm {err_Go:.1g}")
+
 #Reporte
-df_reporte['dH[KJ/mol]']=Reporte_valor(np.append(H_lista,[np.nan]*2),np.append(err_H_lista,[np.nan]*2))
-df_reporte['dS[KJ/K.mol]']=Reporte_valor(np.append(S_lista,[np.nan]*2),np.append(err_S_lista,[np.nan]*2))
+df_reporte['dH[KJ/mol]']=Reporte_valor(H_lista,err_H_lista)
+df_reporte['dS[KJ/K.mol]']=Reporte_valor(S_lista,err_S_lista)
+
 # %%
 # Figura termo vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
-
-Tnuestro=Temps[3:-2]
-axes[0].errorbar(
-    x=Tnuestro,
-    y=Go_lista[3:],
-    yerr=err_go_lista[3:],
+fig,axes = plt.subplots()
+plt.errorbar(
+    x=Temps,
+    y=Go_lista,
+    yerr=err_go_lista,
     label=r'$\Delta_{mic}G^0$',
     zorder=20,
     fmt='-x',
     capsize=3
 )
 
-axes[0].errorbar(
-    x=Tnuestro,
-    y=H_lista[3:],
-    yerr=err_H_lista[3:],
+plt.errorbar(
+    x=Temps,
+    y=H_lista,
+    yerr=err_H_lista,
     fmt='-x',
     capsize=3,
-    label=r'$\Delta_{mic}H^0$'
+    label=r'$\Delta_{mic}H^0$',
+    zorder=20
 )
 
-axes[0].errorbar(
-    x=Tnuestro,
-    y=S_lista[3:],
-    yerr=err_S_lista[3:],
+plt.errorbar(
+    x=Temps,
+    y=TxS_lista,
+    yerr=err_TxS_lista,
     fmt='-x',
     capsize=3,
-    label=r'$\Delta_{mic}S^0$'
+    label=r'$T \Delta_{mic}S^0$'
 )
 
-
-
-
-#datos del excel
-axes[1].errorbar(
-    x=Temps[:3],
-    y=Go_lista[:3],
-    yerr=err_go_lista[:3],
-    fmt='-x',
-    capsize=3,
-    label=r'$\Delta_{mic}G^0$'
-)
-axes[1].errorbar(
-    x=Temps[:3],
-    y=H_lista[:3],
-    yerr=err_H_lista[:3],
-    fmt='-x',
-    capsize=3,
-    label=r'$\Delta_{mic}H^0$'
-)
-axes[1].errorbar(
-    x=Temps[:3],
-    y=S_lista[:3]*Temps[:3],
-    yerr=err_S_lista[:3],
-    fmt='-x',
-    capsize=3,
-    label=r'$T\Delta_{mic}S^0$'
-)
 
 plt.legend(bbox_to_anchor=(1,1),loc='upper left')
-axes[0].legend_=None
 
-axes[0].set(
-    title="[1]",
+axes.set(
     xlabel="T[K]",
     ylabel=r"$\Delta_{mis}G^0,\Delta_{mis}H^0,T\Delta_{mis}S^0\ \left[kJ/mol\right]$",
     ylim=[-30,30]
 )
-axes[1].set(
-    xlabel="T[K]",
-    title="[2]"
-)
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
+
+#%%
+#si usaba ambas series de datos
+# fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
+
+# Tnuestro=Temps[3:-2]
+# axes[0].errorbar(
+#     x=Tnuestro,
+#     y=Go_lista[3:],
+#     yerr=err_go_lista[3:],
+#     label=r'$\Delta_{mic}G^0$',
+#     zorder=20,
+#     fmt='-x',
+#     capsize=3
+# )
+
+# axes[0].errorbar(
+#     x=Tnuestro,
+#     y=H_lista[3:],
+#     yerr=err_H_lista[3:],
+#     fmt='-x',
+#     capsize=3,
+#     label=r'$\Delta_{mic}H^0$'
+# )
+
+# axes[0].errorbar(
+#     x=Tnuestro,
+#     y=S_lista[3:],
+#     yerr=err_S_lista[3:],
+#     fmt='-x',
+#     capsize=3,
+#     label=r'$\Delta_{mic}S^0$'
+# )
+
+
+
+
+# #datos del excel
+# axes[1].errorbar(
+#     x=Temps[:3],
+#     y=Go_lista[:3],
+#     yerr=err_go_lista[:3],
+#     fmt='-x',
+#     capsize=3,
+#     label=r'$\Delta_{mic}G^0$'
+# )
+# axes[1].errorbar(
+#     x=Temps[:3],
+#     y=H_lista[:3],
+#     yerr=err_H_lista[:3],
+#     fmt='-x',
+#     capsize=3,
+#     label=r'$\Delta_{mic}H^0$'
+# )
+# axes[1].errorbar(
+#     x=Temps[:3],
+#     y=S_lista[:3]*Temps[:3],
+#     yerr=err_S_lista[:3],
+#     fmt='-x',
+#     capsize=3,
+#     label=r'$T\Delta_{mic}S^0$'
+# )
+
+# plt.legend(bbox_to_anchor=(1,1),loc='upper left')
+# axes[0].legend_=None
+
+# axes[0].set(
+#     title="[1]",
+#     xlabel="T[K]",
+#     ylabel=r"$\Delta_{mis}G^0,\Delta_{mis}H^0,T\Delta_{mis}S^0\ \left[kJ/mol\right]$",
+#     ylim=[-30,30]
+# )
+# axes[1].set(
+#     xlabel="T[K]",
+#     title="[2]"
+# )
+# plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 #%%
 # Reportes (ignorar)
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -971,11 +1051,13 @@ Tabla_Latex(df_cmc,label='cmc',caption="valores de CMC calculados")
 export_go=[redondeo(Go_lista[i],err_go_lista[i]) for i in range(len(Go_lista))]
 export_H=[redondeo(H_lista[i],err_H_lista[i]) for i in range(len(H_lista))]
 export_S=[redondeo(S_lista[i],err_S_lista[i]) for i in range(len(S_lista))]
+export_TS=[redondeo(TxS_lista[i],err_TxS_lista[i]) for i in range(len(TxS_lista))]
 export_termo=pd.DataFrame({
-    "T [K]":Temps[:-2],
-    "$\\Delta_{\\text{mic}}G^0 [KJ/mol]$":export_go,
-    "$\\Delta_{\\text{mic}}H^0 [KJ/mol]$":export_H,
-    "$\\Delta_{\\text{mic}}S^0 [KJ/mol]$":export_S,
+    "T [K]":Temps,
+    "$\\Delta_{\\text{mic}}G^0 [kJ/mol]$":export_go,
+    "$\\Delta_{\\text{mic}}H^0 [kJ/mol]$":export_H,
+    "$\\Delta_{\\text{mic}}S^0 [kJ/mol.K]$":export_S,
+    "$T \\Delta_{\\text{mic}}S^0 [kJ/mol]$":export_TS,
 
 })
 
