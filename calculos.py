@@ -545,60 +545,35 @@ df_reporte['delta_Go[kJ/mol]']= Reporte_valor(
 # alfa vsT
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-#hay 2 ajustes linials, alta a T bajos y alfa a T altos
-#el de menor T
 # pendiente=dalfa/dT=[1/T]
-medicion_cambio_pendiente=2
-x= Temps[:medicion_cambio_pendiente]
-y = alpha_lista[:medicion_cambio_pendiente]
+x= Temps
+y = alpha_lista
 x = sm.add_constant(x)
-model_menor = sm.OLS(y,x).fit()
+model_menor = sm.regression.linear_model.WLS(y,x,weights=1/np.array(err_alpha_lista)).fit()
 print_model_menor = model_menor.summary()
 print(print_model_menor)
 
 ordenada_menor,pendiente_menor= model_menor.params
 err_ordenada_menor, err_pendiente_menor = model_menor.bse
 r2_menor=model_menor.rsquared
+predictions_menor=model_menor.predict(x)
 
-x_ci_menor=np.linspace(Temps[0],Temps[medicion_cambio_pendiente],100)
+dalfa_dT=pendiente_menor
+err_dalfa_dT=err_pendiente_menor
+
+
+x_ci_menor=np.linspace(Temps[0],Temps[-1],100)
 frame = model_menor.get_prediction(sm.add_constant(x_ci_menor)).summary_frame(alpha=0.01)
 ci_1_low=frame.mean_ci_lower
 ci_1_up=frame.mean_ci_upper
 
-#el de mayor T
-#el -2 es porque en las últimas 2 temp no pude calcular alfa
-x= np.array(Temps[medicion_cambio_pendiente:])
-y = np.array(alpha_lista[medicion_cambio_pendiente:])
-x = sm.add_constant(x)
-model_mayor = sm.OLS(y,x).fit()
-print_model_mayor = model_mayor.summary()
-
-ordenada_mayor, pendiente_mayor= model_mayor.params
-err_ordenada_mayor, err_pendiente_mayor = model_mayor.bse
-r2_mayor=model_mayor.rsquared
-
-
-#voy a tener 2 pendintes dalfa/dT, una para T<25 y otra pra T>25
 #los pongo en la lista dalfa_dT_lista que está emparejada con la Temps
-dalfa_dT_sub25=pendiente_menor
-err_dalfa_dT_sub25=err_pendiente_menor
-dalfa_dT_sob25=pendiente_mayor
-err_dalfa_dT_sob25=err_pendiente_mayor
 
-dalfa_dT_lista=np.array([dalfa_dT_sub25]*len(Temps[:medicion_cambio_pendiente])+[dalfa_dT_sob25]*len(Temps[medicion_cambio_pendiente:]))
-err_dalfa_dT_lista=np.array([err_dalfa_dT_sub25]*len(Temps[:medicion_cambio_pendiente])+[err_dalfa_dT_sob25]*len(Temps[medicion_cambio_pendiente:]))
+dalfa_dT_lista=np.array([pendiente_menor]*len(Temps))
+err_dalfa_dT_lista=np.array([err_pendiente_menor]*len(Temps))
 print(print_model_menor)
 
-#intersección
 
-Tinterseccion=(ordenada_mayor-ordenada_menor)/(-pendiente_mayor+pendiente_menor)
-predictions_menor=model_menor.predict(sm.add_constant([Temps[0],Tinterseccion]))
-predictions_mayor = model_mayor.predict(sm.add_constant([Tinterseccion,Temps[-1]])) 
-
-x_ci_mayor=np.linspace(Tinterseccion,x[-1][1],50)
-frame = model_mayor.get_prediction(sm.add_constant(x_ci_mayor)).summary_frame(alpha=0.05)
-ci_2_low=frame.mean_ci_lower
-ci_2_up=frame.mean_ci_upper
 #Reportes
 
 #TODO exportar los resultados del ajuste cuadrático
@@ -617,38 +592,21 @@ plt.errorbar(
 )
 
 etiqueta_menor=f'Ajuste lineal a T bajas $R^2=${r2_menor:.3f}\t'
-etiqueta_menor+=r"$\frac{\partial \alpha}{\partial T}=$"+f"{dalfa_dT_sub25:.1e}"
-etiqueta_menor+=" "+r"$T^{-1}$"
+etiqueta_menor+=r"$\frac{\partial \alpha}{\partial T}=$"+f"{dalfa_dT:.1e}"
+etiqueta_menor+=" "+r"$\pm$"+f"{err_dalfa_dT:.1g} "+r"$T^{-1}$"
 plt.plot(
-    [Temps[0],Tinterseccion],
+    Temps,
     predictions_menor,
     ls='--',
     zorder=20,
     label=etiqueta_menor
 )
 
-#no puedo calcular CI para regresión con 2 valores
-# Plot_CI(
-#     X=Temps[:medicion_cambio_pendiente],
-#     CI_lower=ci_1_low,
-#     CI_upper=ci_1_up
-# )
-etiqueta_mayor=f'Ajuste lineal a T altas  $R^2=${r2_mayor:.3f}\t'
-etiqueta_mayor+=r"$\frac{\partial \alpha}{\partial T}=$"+f"{dalfa_dT_sob25:.1e}"
-etiqueta_mayor+=r"$\pm$"+f"{err_dalfa_dT_sob25:.1g} "+r"$T^{-1}$"
-
-plt.plot(
-    [Tinterseccion,Temps[-1]],
-    predictions_mayor,
-    ls='--',
-    label=etiqueta_mayor
-)
 Plot_CI(
-    X=x_ci_mayor,
-    CI_lower=ci_2_low,
-    CI_upper=ci_2_up
+    X=x_ci_menor,
+    CI_lower=ci_1_low,
+    CI_upper=ci_1_up
 )
-
 
 axes.set(
     xlabel="T [K]",
@@ -656,6 +614,7 @@ axes.set(
 )
 plt.legend(#bbox_to_anchor=(1,1),
            loc='upper left')
+plt.show()
 plt.savefig('figuras/alfavst.png',dpi=300,bbox_inches='tight')
 #%% ln(CMC) vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -865,82 +824,6 @@ axes.set(
 )
 plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 
-#%%
-#si usaba ambas series de datos
-# fig,axes = plt.subplots(nrows=1,ncols=2,sharey=True)
-
-# Tnuestro=Temps[3:-2]
-# axes[0].errorbar(
-#     x=Tnuestro,
-#     y=Go_lista[3:],
-#     yerr=err_go_lista[3:],
-#     label=r'$\Delta_{mic}G^0$',
-#     zorder=20,
-#     fmt='-x',
-#     capsize=3
-# )
-
-# axes[0].errorbar(
-#     x=Tnuestro,
-#     y=H_lista[3:],
-#     yerr=err_H_lista[3:],
-#     fmt='-x',
-#     capsize=3,
-#     label=r'$\Delta_{mic}H^0$'
-# )
-
-# axes[0].errorbar(
-#     x=Tnuestro,
-#     y=S_lista[3:],
-#     yerr=err_S_lista[3:],
-#     fmt='-x',
-#     capsize=3,
-#     label=r'$\Delta_{mic}S^0$'
-# )
-
-
-
-
-# #datos del excel
-# axes[1].errorbar(
-#     x=Temps[:3],
-#     y=Go_lista[:3],
-#     yerr=err_go_lista[:3],
-#     fmt='-x',
-#     capsize=3,
-#     label=r'$\Delta_{mic}G^0$'
-# )
-# axes[1].errorbar(
-#     x=Temps[:3],
-#     y=H_lista[:3],
-#     yerr=err_H_lista[:3],
-#     fmt='-x',
-#     capsize=3,
-#     label=r'$\Delta_{mic}H^0$'
-# )
-# axes[1].errorbar(
-#     x=Temps[:3],
-#     y=S_lista[:3]*Temps[:3],
-#     yerr=err_S_lista[:3],
-#     fmt='-x',
-#     capsize=3,
-#     label=r'$T\Delta_{mic}S^0$'
-# )
-
-# plt.legend(bbox_to_anchor=(1,1),loc='upper left')
-# axes[0].legend_=None
-
-# axes[0].set(
-#     title="[1]",
-#     xlabel="T[K]",
-#     ylabel=r"$\Delta_{mis}G^0,\Delta_{mis}H^0,T\Delta_{mis}S^0\ \left[kJ/mol\right]$",
-#     ylim=[-30,30]
-# )
-# axes[1].set(
-#     xlabel="T[K]",
-#     title="[2]"
-# )
-# plt.savefig('figuras/TermovsT.png',dpi=300,bbox_inches='tight')
 #%%
 # Reportes (ignorar)
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
