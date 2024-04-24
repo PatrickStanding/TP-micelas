@@ -614,7 +614,6 @@ axes.set(
 )
 plt.legend(#bbox_to_anchor=(1,1),
            loc='upper left')
-plt.show()
 plt.savefig('figuras/alfavst.png',dpi=300,bbox_inches='tight')
 #%% ln(CMC) vs T
 #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
