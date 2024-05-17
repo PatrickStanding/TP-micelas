@@ -661,7 +661,7 @@ plt.plot(
     np.linspace(Temps[0],Temps[-1],20),
     pol_CMC(np.linspace(Temps[0],Temps[-1],20),*param_pol_CMC),
     linestyle='--',
-    label=r"$CMC=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g} B={param_pol_CMC[1]:.4g} C={param_pol_CMC[2]:.4g}"
+    label=r"$ln(CMC)=A+BT+C/T$"+f"\nA={param_pol_CMC[0]:.4g}   B={param_pol_CMC[1]:.4g} "+r"$K^{-1}$"+f"   C={param_pol_CMC[2]:.4g} "+r"$K$"
 )
 
 
